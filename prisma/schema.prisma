@@ -1,0 +1,82 @@
+// Prisma Schema for AdSkill PayTrack AI Backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserRole {
+  SUPER_ADMIN
+  FINANCE_MANAGER
+  CASE_MANAGER
+  CLIENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum PaymentStatus {
+  DRAFT
+  SCHEDULED
+  UPCOMING
+  DUE_TODAY
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  WAIVED
+  REFUNDED
+  DISPUTED
+  CANCELLED
+}
+
+// ==================== MODELS ====================
+
+model User {
+  id           String     @id @default(uuid())
+  email        String     @unique
+  password     String
+  name         String
+  phone        String?
+  role         UserRole   @default(CLIENT)
+  status       UserStatus @default(ACTIVE)
+  isMfaEnabled Boolean    @default(false)
+  mfaSecret    String?
+
+  // Relations
+  auditLogs    AuditLog[]
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("users")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid())
+  actorId       String?
+  actorEmail    String?
+  action        String
+  entity        String
+  entityId      String?
+  previousValue Json?
+  newValue      Json?
+  reason        String?
+  ipAddress     String?
+  userAgent     String?
+
+  // Relations
+  actor         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  createdAt     DateTime @default(now())
+
+  @@map("audit_logs")
+}
