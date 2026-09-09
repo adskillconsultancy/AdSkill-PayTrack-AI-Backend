@@ -21,18 +21,56 @@ enum UserStatus {
 
 // Dynamic User Role model - supports future role expansion
 model UserRole {
-  id        String    @id @default(uuid())
-  name      String    @unique // e.g. SUPER_ADMIN, MANAGER, CONSULTANT, CLIENT
-  isDeleted Boolean   @default(false)
-  deletedAt DateTime?
+  id              String           @id @default(uuid())
+  name            String           @unique // e.g. SUPER_ADMIN, MANAGER, CONSULTANT, CLIENT
+  isDeleted       Boolean          @default(false)
+  deletedAt       DateTime?
 
   // Relations
-  users     User[]
+  users           User[]
+  rolePermissions RolePermission[]
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   @@map("user_roles")
+}
+
+// Granular System Permission model (PBAC Architecture)
+model Permission {
+  id              String           @id @default(uuid())
+  name            String           @unique // e.g. 'user:read', 'user:create', 'payment:verify'
+  module          String           // e.g. 'USER', 'SERVICE', 'PLAN', 'PAYMENT', 'INVOICE', 'REPORT', 'NOTE'
+  description     String?
+  isDeleted       Boolean          @default(false)
+  deletedAt       DateTime?
+
+  // Relations
+  rolePermissions RolePermission[]
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@map("permissions")
+}
+
+// Role-Permission bridge table for dynamic privilege assignment
+model RolePermission {
+  id           String     @id @default(uuid())
+  roleId       String
+  permissionId String
+  isDeleted    Boolean    @default(false)
+  deletedAt    DateTime?
+
+  // Relations
+  role         UserRole   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
 }
 
 // User model - includes identity, contact, address, and client profile details

@@ -3,6 +3,7 @@ export type TAuthUser = {
   email: string;
   role: string;
   roleId?: string;
+  permissions?: string[];
 };
 
 declare global {

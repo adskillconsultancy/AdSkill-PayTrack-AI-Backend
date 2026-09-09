@@ -7,7 +7,18 @@ import prisma from '../lib/prisma';
 import catchAsync from '../shared/catchAsync';
 import { TAuthUser } from '../interface';
 
-const auth = (...requiredRoles: string[]) => {
+/**
+ * Permission-Based Access Control (PBAC) Authentication & Authorization Middleware
+ *
+ * @param requiredPermissions - One or more permissions required to access the endpoint (e.g. 'user:read')
+ *
+ * Rules:
+ * 1. Requires valid JWT access token.
+ * 2. Validates user account exists, is active, and is not soft deleted.
+ * 3. SUPER_ADMIN has full universal access (bypasses permission checks).
+ * 4. All other roles must possess at least one of the requiredPermissions.
+ */
+const auth = (...requiredPermissions: string[]) => {
   return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
 
@@ -33,7 +44,7 @@ const auth = (...requiredRoles: string[]) => {
 
     const { id } = decoded;
 
-    // Check if user exists and is not soft deleted
+    // Fetch user, role, and granted permissions
     const user = await prisma.user.findUnique({
       where: { id },
       select: {
@@ -46,13 +57,30 @@ const auth = (...requiredRoles: string[]) => {
           select: {
             id: true,
             name: true,
+            isDeleted: true,
+            rolePermissions: {
+              where: {
+                isDeleted: false,
+                permission: { isDeleted: false },
+              },
+              select: {
+                permission: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
       },
     });
 
-    if (!user || user.isDeleted) {
-      throw new AppError(httpStatus.UNAUTHORIZED, 'User not found or account deactivated');
+    if (!user || user.isDeleted || user.role?.isDeleted) {
+      throw new AppError(
+        httpStatus.UNAUTHORIZED,
+        'User account not found or deactivated',
+      );
     }
 
     if (user.status !== 'ACTIVE') {
@@ -62,13 +90,34 @@ const auth = (...requiredRoles: string[]) => {
       );
     }
 
-    // Check role authorization against dynamic role name
     const userRoleName = user.role?.name;
-    if (requiredRoles.length > 0 && (!userRoleName || !requiredRoles.includes(userRoleName))) {
-      throw new AppError(
-        httpStatus.FORBIDDEN,
-        'You do not have permission to perform this action',
+    const userPermissions =
+      user.role?.rolePermissions.map((rp) => rp.permission.name) || [];
+
+    // SUPER_ADMIN has universal unrestricted access across all actions
+    if (userRoleName === 'SUPER_ADMIN') {
+      req.user = {
+        id: user.id,
+        email: user.email,
+        role: userRoleName,
+        roleId: user.roleId,
+        permissions: userPermissions,
+      };
+      return next();
+    }
+
+    // Check if user's role has any of the required permissions
+    if (requiredPermissions.length > 0) {
+      const hasPermission = requiredPermissions.some((perm) =>
+        userPermissions.includes(perm),
       );
+
+      if (!hasPermission) {
+        throw new AppError(
+          httpStatus.FORBIDDEN,
+          'You do not have permission to perform this action',
+        );
+      }
     }
 
     req.user = {
@@ -76,6 +125,7 @@ const auth = (...requiredRoles: string[]) => {
       email: user.email,
       role: userRoleName,
       roleId: user.roleId,
+      permissions: userPermissions,
     };
 
     next();

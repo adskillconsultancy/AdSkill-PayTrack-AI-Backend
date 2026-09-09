@@ -217,21 +217,48 @@ The platform operates on **4 canonical roles** with least-privilege role-based a
 
 ---
 
-### Section 3: Roles and Permissions
-Enforce strict least-privilege access. Every user must possess an individual authenticated account; shared staff logins are strictly prohibited.
+### Section 3: Roles and Permissions (PBAC Architecture)
+The platform enforces strict least-privilege access using **Permission-Based Access Control (PBAC)**. Routes and endpoints do not check hardcoded role names; instead, they check granular permissions granted to roles via the database. Shared staff logins are strictly prohibited.
 
 #### 📌 Registration & Role Update Governance
 - **Default Registration Status:** All new users registering through the portal are automatically assigned the **`Client`** role. Public signups can never choose or grant themselves staff or management roles.
-- **Role Elevation Authority:** Only a **`Super Admin`** has permission to modify, promote, or assign roles to users (promoting a Client to `Manager`, `Consultant`, or `Super Admin`).
+- **Role Elevation Authority:** Only a **`Super Admin`** (possessing the `user:manage-role` permission) has permission to modify, promote, or assign roles to users (promoting a Client to `Manager`, `Consultant`, or `Super Admin`).
 
-| Role | Initial Core Permitted Access Scope |
-| :--- | :--- |
-| **Super Admin** | All clients, employees, roles, financial settings, approvals, reports, integrations, and audit logs. |
-| **Manager** | Create plans, verify payments, issue invoices and receipts, send reminders, and view financial reports. |
-| **Consultant** | View assigned clients, payment status, and notes; no deletion, refund approval, or security administration. |
-| **Client** | View only their own fees, schedules, payments, receipts, and secure payment options; cannot edit financial records. |
+#### 🛡️ PBAC Architecture Principles
+1. **Dynamic Permissions:** Capabilities are defined in the `permissions` table and mapped to roles in `role_permissions`.
+2. **Super Admin Universal Access:** Users with the `SUPER_ADMIN` role automatically possess all permissions across all modules by system design.
+3. **Decoupled Route Protection:** Route guards check required permission keys (e.g. `auth('user:read')`), allowing Super Admins to create new custom roles in the database and assign permissions without backend code modifications.
+4. **Universal Soft-Delete:** Both `permissions` and `role_permissions` tables adhere to the platform-wide soft delete policy (`isDeleted`, `deletedAt`).
 
-> *Note: These represent the Initial Core Features for each role. Additional specialized features will be added in subsequent phases.*
+#### 📋 Canonical Permission Matrix
+
+| Module | Permission Key | Description | Super Admin | Manager | Consultant | Client |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **User** | `user:read` | View user profiles and directory | ✅ | ✅ | ✅ | ✅ *(own)* |
+| **User** | `user:create` | Create staff or client accounts | ✅ | ✅ | ❌ | ❌ |
+| **User** | `user:update` | Update user details | ✅ | ✅ | ❌ | ❌ |
+| **User** | `user:delete` | Soft delete user accounts | ✅ | ❌ | ❌ | ❌ |
+| **User** | `user:manage-role` | Change / elevate user roles | ✅ | ❌ | ❌ | ❌ |
+| **Service** | `service:read` | View service catalog & base fees | ✅ | ✅ | ✅ | ❌ |
+| **Service** | `service:manage` | Create & configure services | ✅ | ❌ | ❌ | ❌ |
+| **Plan** | `plan:read` | View contracted payment plans | ✅ | ✅ | ✅ | ✅ *(own)* |
+| **Plan** | `plan:create` | Create payment plans & installments | ✅ | ✅ | ❌ | ❌ |
+| **Plan** | `plan:update` | Amend payment plans & milestones | ✅ | ✅ | ❌ | ❌ |
+| **Plan** | `plan:delete` | Cancel or soft delete payment plans | ✅ | ❌ | ❌ | ❌ |
+| **Payment** | `payment:read` | View transaction ledgers & proofs | ✅ | ✅ | ✅ | ✅ *(own)* |
+| **Payment** | `payment:record` | Record manual offline payments | ✅ | ✅ | ❌ | ❌ |
+| **Payment** | `payment:verify` | Verify & approve offline payments | ✅ | ✅ | ❌ | ❌ |
+| **Payment** | `payment:refund` | Approve and process refunds | ✅ | ❌ | ❌ | ❌ |
+| **Payment** | `payment:pay` | Pay installments via Stripe | ✅ | ❌ | ❌ | ✅ |
+| **Invoice** | `invoice:read` | View & download PDF invoices | ✅ | ✅ | ✅ | ✅ *(own)* |
+| **Invoice** | `invoice:generate` | Generate branded PDF invoices | ✅ | ✅ | ❌ | ❌ |
+| **Receipt** | `receipt:read` | View & download payment receipts | ✅ | ✅ | ✅ | ✅ *(own)* |
+| **Receipt** | `receipt:generate` | Issue official payment receipts | ✅ | ✅ | ❌ | ❌ |
+| **Report** | `report:view` | View management dashboard metrics | ✅ | ✅ | ❌ | ❌ |
+| **Report** | `report:export` | Export financial reports to CSV/PDF | ✅ | ✅ | ❌ | ❌ |
+| **Note** | `note:read` | View client-visible notes | ✅ | ✅ | ✅ | ✅ |
+| **Note** | `note:create` | Create case notes | ✅ | ✅ | ✅ | ❌ |
+| **Note** | `note:read-internal` | View confidential internal staff notes | ✅ | ✅ | ✅ | ❌ |
 
 ---
 
