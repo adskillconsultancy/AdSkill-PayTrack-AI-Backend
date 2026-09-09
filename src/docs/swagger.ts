@@ -54,6 +54,10 @@ export const swaggerDocument = {
       name: "Audit Logs",
       description: "Immutable financial and security activity trail",
     },
+    {
+      name: "Roles & Permissions",
+      description: "PBAC dynamic role management and granular capability assignment",
+    },
   ],
   components: {
     securitySchemes: {
@@ -734,6 +738,255 @@ export const swaggerDocument = {
               },
             },
           },
+        },
+      },
+    },
+    "/users/{id}/permissions": {
+      get: {
+        tags: ["Users"],
+        summary: "Get effective capabilities for an individual user",
+        description: "Returns role-inherited permissions, direct capability overrides, and effective capabilities. Requires 'user:manage-role'.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "User effective permissions retrieved successfully",
+          },
+        },
+      },
+      patch: {
+        tags: ["Users"],
+        summary: "Assign direct capability overrides to an individual user",
+        description: "Enables granular IAM/WordPress-style capability overrides for an individual user without modifying their role. Requires 'user:manage-role'.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["permissionIds"],
+                properties: {
+                  permissionIds: {
+                    type: "array",
+                    items: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "User direct permissions updated successfully",
+          },
+        },
+      },
+    },
+    "/roles/permissions/all": {
+      get: {
+        tags: ["Roles & Permissions"],
+        summary: "Get all system permissions grouped by module",
+        description: "Returns full canonical permission matrix for dynamic RBAC checkbox grids. Requires 'user:manage-role' permission.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Permissions retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Permissions retrieved successfully" },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          module: { type: "string", example: "USER" },
+                          permissions: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                id: { type: "string", format: "uuid" },
+                                name: { type: "string", example: "user:read" },
+                                description: { type: "string", example: "View user profiles and list" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/roles": {
+      get: {
+        tags: ["Roles & Permissions"],
+        summary: "Get all user roles with their assigned permissions",
+        description: "Returns list of all active roles and their capabilities. Requires 'user:manage-role' permission.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Roles retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Roles retrieved successfully" },
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: { type: "string", format: "uuid" },
+                          name: { type: "string", example: "JR_MANAGER" },
+                          userCount: { type: "number", example: 3 },
+                          isSystemRole: { type: "boolean", example: false },
+                          permissions: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                id: { type: "string", format: "uuid" },
+                                name: { type: "string", example: "user:read" },
+                                module: { type: "string", example: "USER" },
+                                description: { type: "string", example: "View user profiles" },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        tags: ["Roles & Permissions"],
+        summary: "Create a new dynamic role",
+        description: "Creates a new role with optional initial permissions. Requires 'user:manage-role' permission.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["name"],
+                properties: {
+                  name: { type: "string", example: "JR_MANAGER" },
+                  permissionIds: {
+                    type: "array",
+                    items: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "210": {
+            description: "Dynamic role created successfully",
+          },
+        },
+      },
+    },
+    "/roles/{id}": {
+      get: {
+        tags: ["Roles & Permissions"],
+        summary: "Get single role details by ID",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "Role details retrieved successfully" },
+        },
+      },
+      delete: {
+        tags: ["Roles & Permissions"],
+        summary: "Delete custom role",
+        description: "Soft deletes custom role. Immutable system roles cannot be deleted. Requires 'user:manage-role'.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": { description: "Role deleted successfully" },
+        },
+      },
+    },
+    "/roles/{id}/permissions": {
+      patch: {
+        tags: ["Roles & Permissions"],
+        summary: "Update permissions for a role",
+        description: "Synchronizes the exact list of assigned permissions for a role. Requires 'user:manage-role' permission.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["permissionIds"],
+                properties: {
+                  permissionIds: {
+                    type: "array",
+                    items: { type: "string", format: "uuid" },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Role permissions updated successfully" },
         },
       },
     },

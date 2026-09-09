@@ -73,7 +73,20 @@ AdSkill PayTrack AI Backend/
 │   │   │   ├── user.controller.ts # Route handler calling service and sendResponse
 │   │   │   └── user.route.ts      # Route declarations with validateRequest and auth
 │   │   │
-│   │   ├── Auth/                  # [Upcoming] Login, refresh token, password reset, MFA
+│   │   ├── Auth/                  # Authentication, JWT lifecycle, register, login, refresh, getMe
+│   │   │   ├── auth.interface.ts
+│   │   │   ├── auth.validation.ts
+│   │   │   ├── auth.service.ts
+│   │   │   ├── auth.controller.ts
+│   │   │   └── auth.route.ts
+│   │   │
+│   │   ├── Role/                  # PBAC Dynamic Role & Granular Permission Management
+│   │   │   ├── role.interface.ts
+│   │   │   ├── role.validation.ts
+│   │   │   ├── role.service.ts
+│   │   │   ├── role.controller.ts
+│   │   │   └── role.route.ts
+│   │   │
 │   │   ├── Client/                # [Upcoming] Client profile, agreement, assigned consultant
 │   │   ├── Service/               # [Upcoming] Services catalog & fee categories (Section 5)
 │   │   ├── PaymentPlan/           # [Upcoming] Payment plans, installments, schedule math (Section 6)
@@ -198,15 +211,18 @@ All modules register their routes in `src/routes/index.ts`:
 ```ts
 import { Router } from 'express';
 import { HealthRoutes } from '../modules/Health/health.route';
+import { AuthRoutes } from '../modules/Auth/auth.route';
 import { UserRoutes } from '../modules/User/user.route';
+import { RoleRoutes } from '../modules/Role/role.route';
 
 const router = Router();
 
 const moduleRoutes = [
   { path: '/health', route: HealthRoutes },
+  { path: '/auth', route: AuthRoutes },
   { path: '/users', route: UserRoutes },
-  // Future modules:
-  // { path: '/auth', route: AuthRoutes },
+  { path: '/roles', route: RoleRoutes },
+  // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
   // { path: '/services', route: ServiceRoutes },
   // { path: '/payment-plans', route: PaymentPlanRoutes },
@@ -317,3 +333,30 @@ npm run db:studio
 # Format codebase with Prettier
 npm run prettier
 ```
+
+---
+
+## 11. Permission-Based Access Control (PBAC) & User-Level Overrides
+
+The platform enforces least-privilege access using **Permission-Based Access Control (PBAC)** with **Individual Capability Overrides**:
+
+### Data Flow & Resolution:
+1. **Role Permissions**: Stored in `role_permissions` bridge table (`UserRole` $\leftrightarrow$ `Permission`).
+2. **Direct User Overrides**: Stored in `user_permissions` bridge table (`User` $\leftrightarrow$ `Permission`).
+3. **Effective Permissions**: Computed dynamically in `auth.ts` middleware and `formatAuthUser`:
+   $$\text{Effective Capabilities} = \mathbf{RolePermissions} \cup \mathbf{DirectUserPermissions}$$
+4. **Super Admin Bypass**: Users with `SUPER_ADMIN` automatically possess full system access and receive all 22 canonical capabilities.
+
+### Key API Endpoints:
+- `GET /api/v1/roles/permissions/all`: Canonical capability matrix grouped by module.
+- `GET /api/v1/roles` & `POST /api/v1/roles`: Dynamic role listing and creation.
+- `PATCH /api/v1/roles/:id/permissions`: Synchronize permissions assigned to a role.
+- `GET /api/v1/users/:id/permissions`: View a user's role permissions, direct overrides, and effective capabilities.
+- `PATCH /api/v1/users/:id/permissions`: Grant or revoke direct capability overrides for an individual user account.
+
+### Real-World Example (User-Level Override):
+- **Standard Client (Alice)**: Has role `CLIENT`. Effective permissions contain only default client rights (`payment:view_own`, `invoice:view_own`).
+- **Special Client (Bob)**: Has role `CLIENT` + direct override `payment:verify` assigned via `PATCH /api/v1/users/:id/permissions`.
+- **Result**: Bob can access verification endpoints and see verification navigation in UI; Alice is blocked. No new role needed and other clients remain untouched.
+
+

@@ -56,6 +56,19 @@ const auth = (...requiredPermissions: string[]) => {
         status: true,
         isDeleted: true,
         roleId: true,
+        userPermissions: {
+          where: {
+            isDeleted: false,
+            permission: { isDeleted: false },
+          },
+          select: {
+            permission: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
         role: {
           select: {
             id: true,
@@ -94,8 +107,15 @@ const auth = (...requiredPermissions: string[]) => {
     }
 
     const userRoleName = user.role?.name;
-    const userPermissions =
+    const rolePermissions =
       user.role?.rolePermissions.map((rp) => rp.permission.name) || [];
+    const directUserPermissions =
+      user.userPermissions.map((up) => up.permission.name) || [];
+
+    // Unified Effective Capabilities = Role Permissions + Direct User Overrides
+    const effectivePermissions = Array.from(
+      new Set([...rolePermissions, ...directUserPermissions]),
+    );
 
     // SUPER_ADMIN has universal unrestricted access across all actions
     if (userRoleName === "SUPER_ADMIN") {
@@ -104,15 +124,15 @@ const auth = (...requiredPermissions: string[]) => {
         email: user.email,
         role: userRoleName,
         roleId: user.roleId,
-        permissions: userPermissions,
+        permissions: effectivePermissions,
       };
       return next();
     }
 
-    // Check if user's role has any of the required permissions
+    // Check if user has any of the required permissions
     if (requiredPermissions.length > 0) {
       const hasPermission = requiredPermissions.some((perm) =>
-        userPermissions.includes(perm),
+        effectivePermissions.includes(perm),
       );
 
       if (!hasPermission) {
@@ -128,7 +148,7 @@ const auth = (...requiredPermissions: string[]) => {
       email: user.email,
       role: userRoleName,
       roleId: user.roleId,
-      permissions: userPermissions,
+      permissions: effectivePermissions,
     };
 
     next();

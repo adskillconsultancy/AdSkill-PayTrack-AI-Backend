@@ -79,10 +79,39 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getUserPermissions = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.getUserEffectivePermissions(id);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User effective permissions retrieved successfully",
+    data: result,
+  });
+});
+
+const updateUserPermissions = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.updateUserDirectPermissions(
+    id,
+    req.body.permissionIds,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "User direct permissions updated successfully",
+    data: result,
+  });
+});
+
 export const UserController = {
   createUser,
   getAllUsers,
   getUserById,
   updateUser,
   deleteUser,
+  getUserPermissions,
+  updateUserPermissions,
 };

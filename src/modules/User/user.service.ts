@@ -261,10 +261,134 @@ const deleteUser = async (id: string) => {
   return result;
 };
 
+// Retrieve effective permissions for an individual user (Role + Direct Overrides)
+const getUserEffectivePermissions = async (userId: string) => {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, isDeleted: false },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      clientId: true,
+      role: {
+        select: {
+          id: true,
+          name: true,
+          rolePermissions: {
+            where: { isDeleted: false, permission: { isDeleted: false } },
+            select: {
+              permission: {
+                select: {
+                  id: true,
+                  name: true,
+                  module: true,
+                  description: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      userPermissions: {
+        where: { isDeleted: false, permission: { isDeleted: false } },
+        select: {
+          permission: {
+            select: {
+              id: true,
+              name: true,
+              module: true,
+              description: true,
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  const rolePermissions =
+    user.role?.rolePermissions.map((rp) => rp.permission) || [];
+  const directPermissions =
+    user.userPermissions.map((up) => up.permission) || [];
+
+  const effectivePermissionNames = Array.from(
+    new Set([
+      ...rolePermissions.map((p) => p.name),
+      ...directPermissions.map((p) => p.name),
+    ]),
+  );
+
+  return {
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    clientId: user.clientId,
+    role: user.role?.name,
+    rolePermissions,
+    directPermissions,
+    effectivePermissions: effectivePermissionNames,
+  };
+};
+
+// Atomically assign / replace direct user capability overrides
+const updateUserDirectPermissions = async (
+  userId: string,
+  permissionIds: string[],
+) => {
+  const user = await prisma.user.findFirst({
+    where: { id: userId, isDeleted: false },
+  });
+
+  if (!user) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  // Validate all provided permission IDs exist
+  if (permissionIds.length > 0) {
+    const validPerms = await prisma.permission.findMany({
+      where: {
+        id: { in: permissionIds },
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+
+    if (validPerms.length !== permissionIds.length) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "One or more provided permission IDs are invalid",
+      );
+    }
+  }
+
+  // Atomically replace direct permissions
+  await prisma.$transaction(async (tx) => {
+    await tx.userPermission.deleteMany({
+      where: { userId },
+    });
+
+    if (permissionIds.length > 0) {
+      await tx.userPermission.createMany({
+        data: permissionIds.map((permissionId) => ({
+          userId,
+          permissionId,
+        })),
+      });
+    }
+  });
+
+  return await getUserEffectivePermissions(userId);
+};
+
 export const UserService = {
   createUser,
   getAllUsers,
   getUserById,
   updateUser,
   deleteUser,
+  getUserEffectivePermissions,
+  updateUserDirectPermissions,
 };

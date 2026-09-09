@@ -47,6 +47,7 @@ model Permission {
 
   // Relations
   rolePermissions RolePermission[]
+  userPermissions UserPermission[]
 
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -91,18 +92,41 @@ model User {
 
   // Dynamic Role Relation
   roleId               String
-  role                 UserRole   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  role                 UserRole         @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
-  status               UserStatus @default(ACTIVE)
-  isMfaEnabled         Boolean    @default(false)
+  // Direct User Capabilities (IAM / PBAC Overrides)
+  userPermissions      UserPermission[]
+
+  status               UserStatus       @default(ACTIVE)
+  isMfaEnabled         Boolean          @default(false)
   mfaSecret            String?
 
   // Universal Soft Delete Policy
-  isDeleted            Boolean    @default(false)
+  isDeleted            Boolean          @default(false)
   deletedAt            DateTime?
 
-  createdAt            DateTime   @default(now())
-  updatedAt            DateTime   @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 
   @@map("users")
 }
+
+// User-Permission bridge table for direct user capability overrides
+model UserPermission {
+  id           String     @id @default(uuid())
+  userId       String
+  permissionId String
+  isDeleted    Boolean    @default(false)
+  deletedAt    DateTime?
+
+  // Relations
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([userId, permissionId])
+  @@map("user_permissions")
+}
+

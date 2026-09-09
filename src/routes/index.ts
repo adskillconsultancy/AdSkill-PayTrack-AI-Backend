@@ -2,6 +2,7 @@ import { Router } from "express";
 import { HealthRoutes } from "../modules/Health/health.route";
 import { UserRoutes } from "../modules/User/user.route";
 import { AuthRoutes } from "../modules/Auth/auth.route";
+import { RoleRoutes } from "../modules/Role/role.route";
 
 const router = Router();
 
@@ -17,6 +18,10 @@ const moduleRoutes = [
   {
     path: "/users",
     route: UserRoutes,
+  },
+  {
+    path: "/roles",
+    route: RoleRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },

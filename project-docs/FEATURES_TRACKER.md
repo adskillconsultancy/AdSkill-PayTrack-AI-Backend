@@ -14,9 +14,32 @@
 
 | Rule / Governance Requirement | Status | Notes |
 | :--- | :---: | :--- |
-| **Default Registration:** All new users registering through the portal are automatically assigned the **`Client`** role by default. | ⏳ `[ ] Pending` | Public signups cannot self-select staff or admin roles. |
-| **Role Elevation Authority:** Only **`Super Admin`** has permission to view registered users and promote/update their role. | ⏳ `[ ] Pending` | Super Admin can upgrade a Client to Manager, Consultant, or Super Admin. |
-| **Least-Privilege RBAC:** Shared staff logins prohibited; individual accounts with role enforcement. | ⏳ `[ ] Pending` | Middleware & route guards on API and UI. |
+| **Default Registration:** All new users registering through the portal are automatically assigned the **`Client`** role by default. | ✅ `[x] Done` | Backend: Auto-assigned in `auth.service.ts` register. Frontend: Self-registration complete. |
+| **Role Elevation Authority:** Only **`Super Admin`** has permission to view registered users and promote/update their role. | 🔄 `[/] In Progress` | Backend: `PATCH /users/:id` and `/roles` fully guarded. Frontend: Role settings UI pending. |
+| **Least-Privilege PBAC & Overrides:** Dynamic permissions with individual user-level capability overrides. | 🔄 `[/] In Progress` | Backend: 100% complete (DB, middleware, API). Frontend: Sidebar complete; Management UI pending. |
+
+---
+
+## 🛡️ PBAC Capability & Dynamic Role Engine Status (Full Breakdown)
+
+### 🖥️ Backend Implementation (`AdSkill PayTrack AI Backend`)
+- [x] **Done** — **Database Schema**: `UserRole`, `Permission`, `RolePermission`, and `UserPermission` models in PostgreSQL with universal soft delete policy.
+- [x] **Done** — **Canonical Seeding**: Seeded 22 granular capabilities across 7 modules (`USER`, `SERVICE`, `PLAN`, `PAYMENT`, `INVOICE`, `RECEIPT`, `REPORT`, `NOTE`).
+- [x] **Done** — **PBAC Auth Middleware**: Dynamic verification of required capabilities (`auth(...)`) with universal bypass for `SUPER_ADMIN`.
+- [x] **Done** — **User-Level Capability Overrides Engine**: Merges `RolePermissions` + `DirectUserPermissions` into unified `effectivePermissions`.
+- [x] **Done** — **Role Management API**: `GET /api/v1/roles`, `POST /api/v1/roles`, `GET /api/v1/roles/:id`, `PATCH /api/v1/roles/:id/permissions`, `DELETE /api/v1/roles/:id`.
+- [x] **Done** — **Permission Matrix API**: `GET /api/v1/roles/permissions/all` (grouped by module for admin checkbox grid).
+- [x] **Done** — **User Direct Permissions API**: `GET /api/v1/users/:id/permissions` and `PATCH /api/v1/users/:id/permissions`.
+- [x] **Done** — **API Documentation**: Full OpenAPI 3.0 specification in `src/docs/swagger.ts`.
+
+### 🎨 Frontend Implementation (`AdSkill PayTrack AI Frontend`)
+- [x] **Done** — **Dynamic PBAC Sidebar (`Sidebar.tsx`)**: Replaced all hardcoded role strings with pure capability evaluation.
+- [x] **Done** — **Capability Hook (`usePermissions.ts`)**: Provides `hasPermission()`, `hasAnyPermission()`, and `SUPER_ADMIN` universal access.
+- [x] **Done** — **Live User State in Layout**: Header and footer display live user name, initials avatar, and dynamic role title.
+- [ ] **Pending** — **Role & PBAC Management UI (`/settings/roles`)**: Dedicated page for Super Admin to view and create custom roles.
+- [ ] **Pending** — **Permission Matrix Checkbox Grid Component**: Interactive UI grid allowing Super Admin to check/uncheck capabilities per role.
+- [ ] **Pending** — **User Capability Override Modal**: Modal on Client/Staff profile allowing Super Admin to grant individual overrides (e.g. giving one client `payment:verify`).
+- [ ] **Pending** — **RTK Query Role API Slice**: `src/services/api/roles/roleApi.ts` injecting endpoints for `/roles` and `/users/:id/permissions`.
 
 ---
 

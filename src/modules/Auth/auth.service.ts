@@ -11,6 +11,7 @@ import {
   TRefreshTokenResponse,
   TRegisterPayload,
 } from "./auth.interface";
+import { PERMISSIONS } from "../User/user.constant";
 
 // Safe user select definition for auth responses
 const authUserSelect = {
@@ -29,6 +30,16 @@ const authUserSelect = {
   status: true,
   isMfaEnabled: true,
   roleId: true,
+  userPermissions: {
+    where: { isDeleted: false, permission: { isDeleted: false } },
+    select: {
+      permission: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  },
   role: {
     select: {
       id: true,
@@ -54,10 +65,26 @@ const authUserSelect = {
 
 // Helper to sanitize and format user object for responses
 const formatAuthUser = (user: any): TAuthUserResponse => {
-  const permissions =
+  const rolePermissions =
     user.role?.rolePermissions?.map(
       (rp: { permission: { name: string } }) => rp.permission.name,
     ) || [];
+
+  const directUserPermissions =
+    user.userPermissions?.map(
+      (up: { permission: { name: string } }) => up.permission.name,
+    ) || [];
+
+  const permissions =
+    user.role?.name === "SUPER_ADMIN"
+      ? Array.from(
+          new Set([
+            ...Object.values(PERMISSIONS),
+            ...rolePermissions,
+            ...directUserPermissions,
+          ]),
+        )
+      : Array.from(new Set([...rolePermissions, ...directUserPermissions]));
 
   return {
     id: user.id,

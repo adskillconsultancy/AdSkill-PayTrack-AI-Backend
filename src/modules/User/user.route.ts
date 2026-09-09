@@ -32,4 +32,20 @@ router.patch(
 // Delete user by ID (Soft delete - Requires 'user:delete' permission; Super Admin)
 router.delete("/:id", auth(PERMISSIONS.USER_DELETE), UserController.deleteUser);
 
+// Get effective capabilities for a user (Requires 'user:manage-role')
+router.get(
+  "/:id/permissions",
+  auth(PERMISSIONS.USER_MANAGE_ROLE),
+  UserController.getUserPermissions,
+);
+
+// Assign/update direct capability overrides for a user (Requires 'user:manage-role')
+router.patch(
+  "/:id/permissions",
+  auth(PERMISSIONS.USER_MANAGE_ROLE),
+  validateRequest(UserValidation.updateUserPermissionsValidationSchema),
+  UserController.updateUserPermissions,
+);
+
 export const UserRoutes = router;
+

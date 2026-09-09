@@ -51,7 +51,17 @@ const updateUserValidationSchema = z.object({
   }),
 });
 
+const updateUserPermissionsValidationSchema = z.object({
+  body: z.object({
+    permissionIds: z.array(z.string().uuid("Invalid permission ID format"), {
+      required_error: "permissionIds array is required",
+    }),
+  }),
+});
+
 export const UserValidation = {
   createUserValidationSchema,
   updateUserValidationSchema,
+  updateUserPermissionsValidationSchema,
 };
+
