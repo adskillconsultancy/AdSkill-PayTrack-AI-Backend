@@ -23,8 +23,6 @@ export type TCreateUserPayload = {
   state?: string;
   postalCode?: string;
   country?: string;
-  preferredLanguage?: string;
-  communicationConsent?: boolean;
   roleId?: string;
   roleName?: string;
   status?: UserStatus;

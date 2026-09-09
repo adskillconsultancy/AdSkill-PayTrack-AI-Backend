@@ -25,8 +25,6 @@ const safeUserSelect = {
   state: true,
   postalCode: true,
   country: true,
-  preferredLanguage: true,
-  communicationConsent: true,
   roleId: true,
   role: {
     select: {

@@ -10,8 +10,6 @@ export type TRegisterPayload = {
   state?: string;
   postalCode?: string;
   country?: string;
-  preferredLanguage?: string;
-  communicationConsent?: boolean;
 };
 
 export type TLoginPayload = {
@@ -32,8 +30,6 @@ export type TAuthUserResponse = {
   state: string | null;
   postalCode: string | null;
   country: string | null;
-  preferredLanguage: string;
-  communicationConsent: boolean;
   status: string;
   isMfaEnabled: boolean;
   roleId: string;

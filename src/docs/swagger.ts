@@ -279,12 +279,6 @@ export const swaggerDocument = {
           state: { type: "string", example: "ON" },
           postalCode: { type: "string", example: "M5X 1C9" },
           country: { type: "string", example: "Canada" },
-          preferredLanguage: { type: "string", default: "en", example: "en" },
-          communicationConsent: {
-            type: "boolean",
-            default: false,
-            example: true,
-          },
         },
       },
       LoginRequest: {

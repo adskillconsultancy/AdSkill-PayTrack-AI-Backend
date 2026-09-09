@@ -23,8 +23,6 @@ const registerValidationSchema = z.object({
     state: z.string().optional(),
     postalCode: z.string().optional(),
     country: z.string().optional(),
-    preferredLanguage: z.string().optional(),
-    communicationConsent: z.boolean().optional(),
   }),
 });
 

@@ -1,3 +1,4 @@
+import bcryptjs from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -155,6 +156,76 @@ async function main() {
       });
     }
     console.log(`✅ Mapped ${permissionNames.length} permissions to role: ${roleName}`);
+  }
+
+  // 4. Seed Canonical Demo Users for all 4 PBAC Roles
+  console.log('--- 4. Seeding Demo Users ---');
+  const defaultPassword = await bcryptjs.hash('Password123!', 12);
+
+  const demoUsers = [
+    {
+      name: 'AdSkill Super Administrator',
+      preferredName: 'Super Admin',
+      email: 'admin@adskillconsultancy.com',
+      password: defaultPassword,
+      roleName: 'SUPER_ADMIN',
+      status: 'ACTIVE' as const,
+      country: 'United States',
+    },
+    {
+      name: 'Sarah Jenkins',
+      preferredName: 'Sarah',
+      email: 'manager@adskillconsultancy.com',
+      password: defaultPassword,
+      roleName: 'MANAGER',
+      status: 'ACTIVE' as const,
+      phone: '+1 (555) 345-6789',
+      country: 'United States',
+    },
+    {
+      name: 'David Chen',
+      preferredName: 'David',
+      email: 'consultant@adskillconsultancy.com',
+      password: defaultPassword,
+      roleName: 'CONSULTANT',
+      status: 'ACTIVE' as const,
+      phone: '+1 (555) 456-7890',
+      country: 'United States',
+    },
+    {
+      clientId: 'ASK-2026-1001',
+      name: 'Mohammad Rahim',
+      preferredName: 'Rahim',
+      email: 'client@example.com',
+      password: defaultPassword,
+      roleName: 'CLIENT',
+      status: 'ACTIVE' as const,
+      phone: '+1 (555) 234-5678',
+      whatsapp: '+1 (555) 234-5678',
+      country: 'United States',
+    },
+  ];
+
+  for (const user of demoUsers) {
+    const roleId = roleMap.get(user.roleName);
+    if (!roleId) continue;
+
+    const { roleName, ...userData } = user;
+
+    const upsertedUser = await prisma.user.upsert({
+      where: { email: user.email },
+      update: {
+        ...userData,
+        roleId,
+        isDeleted: false,
+      },
+      create: {
+        ...userData,
+        roleId,
+        isDeleted: false,
+      },
+    });
+    console.log(`✅ Demo User seeded: ${upsertedUser.name} (${user.roleName}) -> ${upsertedUser.email}`);
   }
 
   console.log('🎉 PBAC Database Seeding completed successfully!');
