@@ -1,9 +1,8 @@
-import { UserRole } from '@prisma/client';
-
 export type TAuthUser = {
   id: string;
   email: string;
-  role: UserRole;
+  role: string;
+  roleId?: string;
 };
 
 declare global {

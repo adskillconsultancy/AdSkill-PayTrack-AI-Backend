@@ -1,0 +1,47 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Auto Start: Dev Server & Prisma Studio",
+      "dependsOn": [
+        "Backend Server (npm run dev)",
+        "Prisma Studio (npm run db:studio)"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Backend Server (npm run dev)",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "servers",
+        "focus": false
+      }
+    },
+    {
+      "label": "Prisma Studio (npm run db:studio)",
+      "type": "shell",
+      "command": "npm run db:studio",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "servers",
+        "focus": false
+      }
+    }
+  ]
+}

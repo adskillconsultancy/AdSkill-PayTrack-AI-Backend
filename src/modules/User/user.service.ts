@@ -11,15 +11,33 @@ import {
   TUserFilterRequest,
 } from './user.interface';
 
-// Safe user select (excludes password and mfaSecret)
+// Safe user projection (excludes password hash and mfaSecret)
 const safeUserSelect = {
   id: true,
+  clientId: true,
   name: true,
+  preferredName: true,
   email: true,
   phone: true,
-  role: true,
+  whatsapp: true,
+  address: true,
+  city: true,
+  state: true,
+  postalCode: true,
+  country: true,
+  preferredLanguage: true,
+  communicationConsent: true,
+  roleId: true,
+  role: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
   status: true,
   isMfaEnabled: true,
+  isDeleted: true,
+  deletedAt: true,
   createdAt: true,
   updatedAt: true,
 };
@@ -34,15 +52,44 @@ const createUser = async (payload: TCreateUserPayload) => {
     throw new AppError(httpStatus.CONFLICT, 'A user with this email already exists');
   }
 
+  // Resolve role: use provided roleId, roleName, or default to CLIENT per specification
+  let targetRoleId = payload.roleId;
+
+  if (!targetRoleId) {
+    const roleToFind = payload.roleName || 'CLIENT';
+    const role = await prisma.userRole.findFirst({
+      where: { name: roleToFind, isDeleted: false },
+    });
+
+    if (!role) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        `Role "${roleToFind}" does not exist in the database`,
+      );
+    }
+    targetRoleId = role.id;
+  } else {
+    // Validate that roleId exists and is not soft deleted
+    const role = await prisma.userRole.findFirst({
+      where: { id: targetRoleId, isDeleted: false },
+    });
+    if (!role) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'Specified role does not exist');
+    }
+  }
+
   // Hash password
   const hashedPassword = await bcryptjs.hash(
     payload.password,
     config.bcrypt_salt_rounds,
   );
 
+  const { roleName, ...userData } = payload;
+
   const result = await prisma.user.create({
     data: {
-      ...payload,
+      ...userData,
+      roleId: targetRoleId,
       password: hashedPassword,
     },
     select: safeUserSelect,
@@ -66,10 +113,15 @@ const getAllUsers = async (
   const sortBy = options.sortBy || 'createdAt';
   const sortOrder = options.sortOrder || 'desc';
 
-  const { searchTerm, ...filterData } = filters;
+  const { searchTerm, roleName, isDeleted, ...filterData } = filters;
   const andConditions: Prisma.UserWhereInput[] = [];
 
-  // Search in searchable fields
+  // Default: exclude soft-deleted users unless explicitly requested
+  andConditions.push({
+    isDeleted: isDeleted !== undefined ? isDeleted : false,
+  });
+
+  // Search across designated searchable fields
   if (searchTerm) {
     andConditions.push({
       OR: userSearchableFields.map((field) => ({
@@ -81,7 +133,19 @@ const getAllUsers = async (
     });
   }
 
-  // Strict match on specific filter fields (role, status, email)
+  // Filter by role name if supplied
+  if (roleName) {
+    andConditions.push({
+      role: {
+        name: {
+          equals: roleName,
+          mode: 'insensitive',
+        },
+      },
+    });
+  }
+
+  // Filter by exact fields (roleId, status, email, country, etc.)
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
       AND: Object.keys(filterData).map((key) => ({
@@ -127,7 +191,7 @@ const getUserById = async (id: string) => {
     select: safeUserSelect,
   });
 
-  if (!user) {
+  if (!user || user.isDeleted) {
     throw new AppError(httpStatus.NOT_FOUND, 'User not found');
   }
 
@@ -135,14 +199,29 @@ const getUserById = async (id: string) => {
 };
 
 const updateUser = async (id: string, payload: TUpdateUserPayload) => {
-  // Check if user exists
+  // Check if user exists and is not soft deleted
   await getUserById(id);
 
+  const { roleName, password, ...rest } = payload;
+  const updateData: Prisma.UserUpdateInput = { ...rest };
+
+  // Resolve roleName to roleId if supplied
+  if (roleName) {
+    const role = await prisma.userRole.findFirst({
+      where: { name: roleName, isDeleted: false },
+    });
+    if (!role) {
+      throw new AppError(httpStatus.BAD_REQUEST, `Role "${roleName}" does not exist`);
+    }
+    updateData.role = { connect: { id: role.id } };
+  } else if (payload.roleId) {
+    updateData.role = { connect: { id: payload.roleId } };
+  }
+
   // If updating password, hash it first
-  let updateData: Prisma.UserUpdateInput = { ...payload };
-  if (payload.password) {
+  if (password) {
     const hashedPassword = await bcryptjs.hash(
-      payload.password,
+      password,
       config.bcrypt_salt_rounds,
     );
     updateData.password = hashedPassword;
@@ -157,13 +236,18 @@ const updateUser = async (id: string, payload: TUpdateUserPayload) => {
   return result;
 };
 
+// Universal Soft Delete implementation (Never hard delete user records)
 const deleteUser = async (id: string) => {
-  // Check if user exists
+  // Check if user exists and is not already deleted
   await getUserById(id);
 
-  // Soft delete / suspend or delete record
-  const result = await prisma.user.delete({
+  const result = await prisma.user.update({
     where: { id },
+    data: {
+      isDeleted: true,
+      deletedAt: new Date(),
+      status: 'INACTIVE',
+    },
     select: safeUserSelect,
   });
 

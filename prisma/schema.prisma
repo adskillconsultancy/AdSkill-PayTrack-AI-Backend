@@ -11,72 +11,62 @@ datasource db {
 
 // ==================== ENUMS ====================
 
-enum UserRole {
-  SUPER_ADMIN
-  FINANCE_MANAGER
-  CASE_MANAGER
-  CLIENT
-}
-
 enum UserStatus {
   ACTIVE
   INACTIVE
   SUSPENDED
 }
 
-enum PaymentStatus {
-  DRAFT
-  SCHEDULED
-  UPCOMING
-  DUE_TODAY
-  PARTIALLY_PAID
-  PAID
-  OVERDUE
-  WAIVED
-  REFUNDED
-  DISPUTED
-  CANCELLED
-}
-
 // ==================== MODELS ====================
 
-model User {
-  id           String     @id @default(uuid())
-  email        String     @unique
-  password     String
-  name         String
-  phone        String?
-  role         UserRole   @default(CLIENT)
-  status       UserStatus @default(ACTIVE)
-  isMfaEnabled Boolean    @default(false)
-  mfaSecret    String?
+// Dynamic User Role model - supports future role expansion
+model UserRole {
+  id        String    @id @default(uuid())
+  name      String    @unique // e.g. SUPER_ADMIN, MANAGER, CONSULTANT, CLIENT
+  isDeleted Boolean   @default(false)
+  deletedAt DateTime?
 
   // Relations
-  auditLogs    AuditLog[]
+  users     User[]
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  @@map("users")
+  @@map("user_roles")
 }
 
-model AuditLog {
-  id            String   @id @default(uuid())
-  actorId       String?
-  actorEmail    String?
-  action        String
-  entity        String
-  entityId      String?
-  previousValue Json?
-  newValue      Json?
-  reason        String?
-  ipAddress     String?
-  userAgent     String?
+// User model - includes identity, contact, address, and client profile details
+model User {
+  id                   String     @id @default(uuid())
+  clientId             String?    @unique // Unique business ID for clients (e.g. ASK-2026-0001)
+  name                 String     // Legal full name
+  preferredName        String?    // Preferred name
+  email                String     @unique
+  password             String
+  phone                String?
+  whatsapp             String?    // WhatsApp contact number
+  address              String?    // Physical street address
+  city                 String?
+  state                String?
+  postalCode           String?
+  country              String?    // Country of origin / residence
+  preferredLanguage    String     @default("en")
+  communicationConsent Boolean    @default(false)
 
-  // Relations
-  actor         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  // Dynamic Role Relation
+  roleId               String
+  role                 UserRole   @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
-  createdAt     DateTime @default(now())
+  status               UserStatus @default(ACTIVE)
+  isMfaEnabled         Boolean    @default(false)
+  mfaSecret            String?
 
-  @@map("audit_logs")
+  // Universal Soft Delete Policy
+  isDeleted            Boolean    @default(false)
+  deletedAt            DateTime?
+
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+
+  @@map("users")
 }

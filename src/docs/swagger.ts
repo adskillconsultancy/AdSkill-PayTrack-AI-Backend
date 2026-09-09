@@ -66,7 +66,7 @@ export const swaggerDocument = {
     schemas: {
       UserRole: {
         type: 'string',
-        enum: ['SUPER_ADMIN', 'FINANCE_MANAGER', 'CASE_MANAGER', 'CLIENT'],
+        enum: ['SUPER_ADMIN', 'MANAGER', 'CONSULTANT', 'CLIENT'],
       },
       UserStatus: {
         type: 'string',
@@ -93,6 +93,25 @@ export const swaggerDocument = {
             type: 'string',
             nullable: true,
             example: '+1-416-555-0199',
+          },
+          whatsapp: {
+            type: 'string',
+            nullable: true,
+            example: '+1-416-555-0199',
+          },
+          address: {
+            type: 'string',
+            nullable: true,
+            example: '100 King St W, Suite 5600, Toronto, ON',
+          },
+          clientId: {
+            type: 'string',
+            nullable: true,
+            example: 'ASK-2026-0001',
+          },
+          isDeleted: {
+            type: 'boolean',
+            example: false,
           },
           role: {
             $ref: '#/components/schemas/UserRole',
@@ -333,7 +352,7 @@ export const swaggerDocument = {
       get: {
         tags: ['Users'],
         summary: 'Get paginated list of users',
-        description: 'Filter and search through users. Requires SUPER_ADMIN or FINANCE_MANAGER authentication.',
+        description: 'Filter and search through users. Requires SUPER_ADMIN or MANAGER authentication.',
         security: [{ bearerAuth: [] }],
         parameters: [
           {

@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "prettier": "prettier --write \"src/**/*.ts\""
   },
@@ -46,5 +47,8 @@
     "prisma": "^5.22.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.7.3"
+  },
+  "prisma": {
+    "seed": "ts-node prisma/seed.ts"
   }
 }

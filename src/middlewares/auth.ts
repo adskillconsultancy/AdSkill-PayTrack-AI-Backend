@@ -1,14 +1,13 @@
 import { NextFunction, Request, Response } from 'express';
 import httpStatus from 'http-status';
 import jwt, { JwtPayload } from 'jsonwebtoken';
-import { UserRole } from '@prisma/client';
 import config from '../config';
 import AppError from '../errors/AppError';
 import prisma from '../lib/prisma';
 import catchAsync from '../shared/catchAsync';
 import { TAuthUser } from '../interface';
 
-const auth = (...requiredRoles: UserRole[]) => {
+const auth = (...requiredRoles: string[]) => {
   return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
     const authHeader = req.headers.authorization;
 
@@ -32,16 +31,28 @@ const auth = (...requiredRoles: UserRole[]) => {
       config.jwt.access_secret as string,
     ) as JwtPayload & TAuthUser;
 
-    const { id, role } = decoded;
+    const { id } = decoded;
 
-    // Check if user exists and is active
+    // Check if user exists and is not soft deleted
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, role: true, status: true },
+      select: {
+        id: true,
+        email: true,
+        status: true,
+        isDeleted: true,
+        roleId: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
     });
 
-    if (!user) {
-      throw new AppError(httpStatus.UNAUTHORIZED, 'User not found');
+    if (!user || user.isDeleted) {
+      throw new AppError(httpStatus.UNAUTHORIZED, 'User not found or account deactivated');
     }
 
     if (user.status !== 'ACTIVE') {
@@ -51,8 +62,9 @@ const auth = (...requiredRoles: UserRole[]) => {
       );
     }
 
-    // Check role authorization
-    if (requiredRoles.length > 0 && !requiredRoles.includes(role)) {
+    // Check role authorization against dynamic role name
+    const userRoleName = user.role?.name;
+    if (requiredRoles.length > 0 && (!userRoleName || !requiredRoles.includes(userRoleName))) {
       throw new AppError(
         httpStatus.FORBIDDEN,
         'You do not have permission to perform this action',
@@ -62,7 +74,8 @@ const auth = (...requiredRoles: UserRole[]) => {
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.role,
+      role: userRoleName,
+      roleId: user.roleId,
     };
 
     next();

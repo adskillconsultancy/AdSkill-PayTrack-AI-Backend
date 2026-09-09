@@ -1,23 +1,23 @@
 import { Router } from 'express';
-import { UserRole } from '@prisma/client';
 import auth from '../../middlewares/auth';
 import validateRequest from '../../middlewares/validateRequest';
 import { UserController } from './user.controller';
 import { UserValidation } from './user.validation';
+import { USER_ROLES } from './user.constant';
 
 const router = Router();
 
-// Create new user
+// Create new user (Public registration defaults to CLIENT; staff can create with role)
 router.post(
   '/',
   validateRequest(UserValidation.createUserValidationSchema),
   UserController.createUser,
 );
 
-// Get all users (Staff only)
+// Get all users (Super Admin & Manager only)
 router.get(
   '/',
-  auth(UserRole.SUPER_ADMIN, UserRole.FINANCE_MANAGER),
+  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.MANAGER),
   UserController.getAllUsers,
 );
 
@@ -25,26 +25,26 @@ router.get(
 router.get(
   '/:id',
   auth(
-    UserRole.SUPER_ADMIN,
-    UserRole.FINANCE_MANAGER,
-    UserRole.CASE_MANAGER,
-    UserRole.CLIENT,
+    USER_ROLES.SUPER_ADMIN,
+    USER_ROLES.MANAGER,
+    USER_ROLES.CONSULTANT,
+    USER_ROLES.CLIENT,
   ),
   UserController.getUserById,
 );
 
-// Update user by ID
+// Update user by ID (Super Admin & Manager)
 router.patch(
   '/:id',
-  auth(UserRole.SUPER_ADMIN, UserRole.FINANCE_MANAGER),
+  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.MANAGER),
   validateRequest(UserValidation.updateUserValidationSchema),
   UserController.updateUser,
 );
 
-// Delete user by ID (Super Admin only)
+// Delete user by ID (Soft delete - Super Admin only)
 router.delete(
   '/:id',
-  auth(UserRole.SUPER_ADMIN),
+  auth(USER_ROLES.SUPER_ADMIN),
   UserController.deleteUser,
 );
 
