@@ -1,15 +1,15 @@
-import bcryptjs from 'bcryptjs';
-import { Prisma } from '@prisma/client';
-import httpStatus from 'http-status';
-import config from '../../config';
-import AppError from '../../errors/AppError';
-import prisma from '../../lib/prisma';
-import { userSearchableFields } from './user.constant';
+import bcryptjs from "bcryptjs";
+import { Prisma } from "@prisma/client";
+import httpStatus from "http-status";
+import config from "../../config";
+import AppError from "../../errors/AppError";
+import prisma from "../../lib/prisma";
+import { userSearchableFields } from "./user.constant";
 import {
   TCreateUserPayload,
   TUpdateUserPayload,
   TUserFilterRequest,
-} from './user.interface';
+} from "./user.interface";
 
 // Safe user projection (excludes password hash and mfaSecret)
 const safeUserSelect = {
@@ -49,14 +49,17 @@ const createUser = async (payload: TCreateUserPayload) => {
   });
 
   if (existingUser) {
-    throw new AppError(httpStatus.CONFLICT, 'A user with this email already exists');
+    throw new AppError(
+      httpStatus.CONFLICT,
+      "A user with this email already exists",
+    );
   }
 
   // Resolve role: use provided roleId, roleName, or default to CLIENT per specification
   let targetRoleId = payload.roleId;
 
   if (!targetRoleId) {
-    const roleToFind = payload.roleName || 'CLIENT';
+    const roleToFind = payload.roleName || "CLIENT";
     const role = await prisma.userRole.findFirst({
       where: { name: roleToFind, isDeleted: false },
     });
@@ -74,7 +77,10 @@ const createUser = async (payload: TCreateUserPayload) => {
       where: { id: targetRoleId, isDeleted: false },
     });
     if (!role) {
-      throw new AppError(httpStatus.BAD_REQUEST, 'Specified role does not exist');
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Specified role does not exist",
+      );
     }
   }
 
@@ -104,14 +110,14 @@ const getAllUsers = async (
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
   },
 ) => {
   const page = Number(options.page) || 1;
   const limit = Number(options.limit) || 10;
   const skip = (page - 1) * limit;
-  const sortBy = options.sortBy || 'createdAt';
-  const sortOrder = options.sortOrder || 'desc';
+  const sortBy = options.sortBy || "createdAt";
+  const sortOrder = options.sortOrder || "desc";
 
   const { searchTerm, roleName, isDeleted, ...filterData } = filters;
   const andConditions: Prisma.UserWhereInput[] = [];
@@ -127,7 +133,7 @@ const getAllUsers = async (
       OR: userSearchableFields.map((field) => ({
         [field]: {
           contains: searchTerm,
-          mode: 'insensitive',
+          mode: "insensitive",
         },
       })),
     });
@@ -139,7 +145,7 @@ const getAllUsers = async (
       role: {
         name: {
           equals: roleName,
-          mode: 'insensitive',
+          mode: "insensitive",
         },
       },
     });
@@ -192,7 +198,7 @@ const getUserById = async (id: string) => {
   });
 
   if (!user || user.isDeleted) {
-    throw new AppError(httpStatus.NOT_FOUND, 'User not found');
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
   }
 
   return user;
@@ -211,7 +217,10 @@ const updateUser = async (id: string, payload: TUpdateUserPayload) => {
       where: { name: roleName, isDeleted: false },
     });
     if (!role) {
-      throw new AppError(httpStatus.BAD_REQUEST, `Role "${roleName}" does not exist`);
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        `Role "${roleName}" does not exist`,
+      );
     }
     updateData.role = { connect: { id: role.id } };
   } else if (payload.roleId) {
@@ -246,7 +255,7 @@ const deleteUser = async (id: string) => {
     data: {
       isDeleted: true,
       deletedAt: new Date(),
-      status: 'INACTIVE',
+      status: "INACTIVE",
     },
     select: safeUserSelect,
   });

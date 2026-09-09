@@ -1,4 +1,4 @@
-import { UserStatus } from '@prisma/client';
+import { UserStatus } from "@prisma/client";
 
 export type TUserFilterRequest = {
   searchTerm?: string;
@@ -31,4 +31,4 @@ export type TCreateUserPayload = {
   clientId?: string;
 };
 
-export type TUpdateUserPayload = Partial<Omit<TCreateUserPayload, 'email'>>;
+export type TUpdateUserPayload = Partial<Omit<TCreateUserPayload, "email">>;

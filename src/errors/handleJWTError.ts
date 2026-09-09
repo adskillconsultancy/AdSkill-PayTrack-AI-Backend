@@ -1,6 +1,6 @@
-import httpStatus from 'http-status';
-import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
-import { TGenericErrorResponse } from '../interface/error';
+import httpStatus from "http-status";
+import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
+import { TGenericErrorResponse } from "../interface/error";
 
 export const handleJWTError = (
   err: JsonWebTokenError | TokenExpiredError,
@@ -8,11 +8,12 @@ export const handleJWTError = (
   if (err instanceof TokenExpiredError) {
     return {
       statusCode: httpStatus.UNAUTHORIZED,
-      message: 'Token Expired',
+      message: "Token Expired",
       errorSources: [
         {
-          path: '',
-          message: 'Your authentication token has expired. Please log in again.',
+          path: "",
+          message:
+            "Your authentication token has expired. Please log in again.",
         },
       ],
     };
@@ -20,11 +21,11 @@ export const handleJWTError = (
 
   return {
     statusCode: httpStatus.UNAUTHORIZED,
-    message: 'Invalid Token',
+    message: "Invalid Token",
     errorSources: [
       {
-        path: '',
-        message: 'The provided authentication token is invalid or malformed.',
+        path: "",
+        message: "The provided authentication token is invalid or malformed.",
       },
     ],
   };

@@ -1,5 +1,5 @@
-import { RequestHandler } from 'express';
-import httpStatus from 'http-status';
+import { RequestHandler } from "express";
+import httpStatus from "http-status";
 
 const notFound: RequestHandler = (req, res) => {
   res.status(httpStatus.NOT_FOUND).json({
@@ -8,7 +8,7 @@ const notFound: RequestHandler = (req, res) => {
     errorSources: [
       {
         path: req.originalUrl,
-        message: 'The requested API endpoint does not exist',
+        message: "The requested API endpoint does not exist",
       },
     ],
   });

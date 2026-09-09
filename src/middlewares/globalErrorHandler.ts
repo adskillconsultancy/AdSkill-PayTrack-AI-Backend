@@ -1,23 +1,23 @@
-import { ErrorRequestHandler } from 'express';
-import { ZodError } from 'zod';
-import { Prisma } from '@prisma/client';
-import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
-import httpStatus from 'http-status';
-import config from '../config';
-import AppError from '../errors/AppError';
-import handleZodError from '../errors/handleZodError';
-import handlePrismaError from '../errors/handlePrismaError';
-import { handleJWTError } from '../errors/handleJWTError';
-import { TErrorSource } from '../interface/error';
+import { ErrorRequestHandler } from "express";
+import { ZodError } from "zod";
+import { Prisma } from "@prisma/client";
+import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
+import httpStatus from "http-status";
+import config from "../config";
+import AppError from "../errors/AppError";
+import handleZodError from "../errors/handleZodError";
+import handlePrismaError from "../errors/handlePrismaError";
+import { handleJWTError } from "../errors/handleJWTError";
+import { TErrorSource } from "../interface/error";
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
   let statusCode: number = httpStatus.INTERNAL_SERVER_ERROR;
-  let message = 'Internal server error';
+  let message = "Internal server error";
   let errorSources: TErrorSource[] = [
     {
-      path: '',
-      message: 'Something went wrong',
+      path: "",
+      message: "Something went wrong",
     },
   ];
 
@@ -38,10 +38,10 @@ const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // 3. Prisma Schema Validation Error
   else if (err instanceof Prisma.PrismaClientValidationError) {
     statusCode = httpStatus.BAD_REQUEST;
-    message = 'Database validation error';
+    message = "Database validation error";
     errorSources = [
       {
-        path: '',
+        path: "",
         message: err.message,
       },
     ];
@@ -49,16 +49,19 @@ const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
   // 4. Prisma Connection / Initialization Error
   else if (err instanceof Prisma.PrismaClientInitializationError) {
     statusCode = httpStatus.SERVICE_UNAVAILABLE;
-    message = 'Database Connection Failed';
+    message = "Database Connection Failed";
     errorSources = [
       {
-        path: '',
-        message: 'Unable to connect to the database. Please try again later.',
+        path: "",
+        message: "Unable to connect to the database. Please try again later.",
       },
     ];
   }
   // 5. JWT Auth Errors (Expired or Malformed)
-  else if (err instanceof JsonWebTokenError || err instanceof TokenExpiredError) {
+  else if (
+    err instanceof JsonWebTokenError ||
+    err instanceof TokenExpiredError
+  ) {
     const formatted = handleJWTError(err);
     statusCode = formatted.statusCode;
     message = formatted.message;
@@ -70,7 +73,7 @@ const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
     message = err.message;
     errorSources = [
       {
-        path: '',
+        path: "",
         message: err.message,
       },
     ];
@@ -80,7 +83,7 @@ const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
     message = err.message;
     errorSources = [
       {
-        path: '',
+        path: "",
         message: err.message,
       },
     ];
@@ -91,7 +94,7 @@ const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
     success: false,
     message,
     errorSources,
-    ...(config.env === 'development' && { stack: err?.stack }),
+    ...(config.env === "development" && { stack: err?.stack }),
   });
 };
 

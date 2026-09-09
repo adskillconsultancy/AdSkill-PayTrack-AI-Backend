@@ -1,22 +1,22 @@
-import { z } from 'zod';
-import { UserStatus } from '@prisma/client';
+import { z } from "zod";
+import { UserStatus } from "@prisma/client";
 
 const createUserValidationSchema = z.object({
   body: z.object({
     name: z.string({
-      required_error: 'Name is required',
+      required_error: "Name is required",
     }),
     preferredName: z.string().optional(),
     email: z
       .string({
-        required_error: 'Email is required',
+        required_error: "Email is required",
       })
-      .email('Invalid email address format'),
+      .email("Invalid email address format"),
     password: z
       .string({
-        required_error: 'Password is required',
+        required_error: "Password is required",
       })
-      .min(6, 'Password must be at least 6 characters long'),
+      .min(6, "Password must be at least 6 characters long"),
     phone: z.string().optional(),
     whatsapp: z.string().optional(),
     address: z.string().optional(),
@@ -26,7 +26,7 @@ const createUserValidationSchema = z.object({
     country: z.string().optional(),
     preferredLanguage: z.string().optional(),
     communicationConsent: z.boolean().optional(),
-    roleId: z.string().uuid('Invalid role ID format').optional(),
+    roleId: z.string().uuid("Invalid role ID format").optional(),
     roleName: z.string().optional(),
     status: z.nativeEnum(UserStatus).optional(),
     clientId: z.string().optional(),
@@ -47,7 +47,7 @@ const updateUserValidationSchema = z.object({
     country: z.string().optional(),
     preferredLanguage: z.string().optional(),
     communicationConsent: z.boolean().optional(),
-    roleId: z.string().uuid('Invalid role ID format').optional(),
+    roleId: z.string().uuid("Invalid role ID format").optional(),
     roleName: z.string().optional(),
     status: z.nativeEnum(UserStatus).optional(),
     clientId: z.string().optional(),

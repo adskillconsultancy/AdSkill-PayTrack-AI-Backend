@@ -1,25 +1,25 @@
-import { Prisma } from '@prisma/client';
-import httpStatus from 'http-status';
-import { TErrorSource, TGenericErrorResponse } from '../interface/error';
+import { Prisma } from "@prisma/client";
+import httpStatus from "http-status";
+import { TErrorSource, TGenericErrorResponse } from "../interface/error";
 
 const handlePrismaError = (
   err: Prisma.PrismaClientKnownRequestError,
 ): TGenericErrorResponse => {
   let statusCode: number = httpStatus.BAD_REQUEST;
-  let message = 'Database Error';
+  let message = "Database Error";
   let errorSources: TErrorSource[] = [];
 
   switch (err.code) {
     // Unique constraint failed
-    case 'P2002': {
+    case "P2002": {
       const target = err.meta?.target;
       const field = Array.isArray(target)
-        ? target.join(', ')
-        : typeof target === 'string'
-        ? target
-        : 'field';
+        ? target.join(", ")
+        : typeof target === "string"
+          ? target
+          : "field";
       statusCode = httpStatus.CONFLICT;
-      message = 'Duplicate Record';
+      message = "Duplicate Record";
       errorSources = [
         {
           path: field,
@@ -30,10 +30,10 @@ const handlePrismaError = (
     }
 
     // Foreign key constraint failed
-    case 'P2003': {
-      const field = (err.meta?.field_name as string) || 'field';
+    case "P2003": {
+      const field = (err.meta?.field_name as string) || "field";
       statusCode = httpStatus.BAD_REQUEST;
-      message = 'Foreign Key Constraint Violation';
+      message = "Foreign Key Constraint Violation";
       errorSources = [
         {
           path: field,
@@ -44,14 +44,15 @@ const handlePrismaError = (
     }
 
     // Record not found
-    case 'P2025': {
+    case "P2025": {
       statusCode = httpStatus.NOT_FOUND;
-      message = 'Record Not Found';
+      message = "Record Not Found";
       errorSources = [
         {
-          path: '',
+          path: "",
           message:
-            (err.meta?.cause as string) || 'The requested record does not exist',
+            (err.meta?.cause as string) ||
+            "The requested record does not exist",
         },
       ];
       break;
@@ -60,7 +61,7 @@ const handlePrismaError = (
     default: {
       errorSources = [
         {
-          path: '',
+          path: "",
           message: err.message,
         },
       ];

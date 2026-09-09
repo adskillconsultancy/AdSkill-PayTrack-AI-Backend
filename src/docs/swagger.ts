@@ -1,430 +1,420 @@
 export const swaggerDocument = {
-  openapi: '3.0.3',
+  openapi: "3.0.3",
   info: {
-    title: 'AdSkill PayTrack AI - Backend API',
-    version: '1.0.0',
+    title: "AdSkill PayTrack AI - Backend API",
+    version: "1.0.0",
     description:
-      'Official REST API documentation for the AdSkill Client Payment Tracker system. Supports client accounts, payment plans, installment schedules, invoices, and audit tracking.',
+      "Official REST API documentation for the AdSkill Client Payment Tracker system. Supports client accounts, payment plans, installment schedules, invoices, and audit tracking.",
     contact: {
-      name: 'AdSkill Engineering Team',
-      email: 'support@adskill.com',
+      name: "AdSkill Engineering Team",
+      email: "support@adskill.com",
     },
   },
   servers: [
     {
-      url: '/api/v1',
-      description: 'Current API Server (v1)',
+      url: "/api/v1",
+      description: "Current API Server (v1)",
     },
     {
-      url: 'http://localhost:5000/api/v1',
-      description: 'Local Development Server',
+      url: "http://localhost:5000/api/v1",
+      description: "Local Development Server",
     },
   ],
   tags: [
     {
-      name: 'Health',
-      description: 'System health check and uptime monitor',
+      name: "Health",
+      description: "System health check and uptime monitor",
     },
     {
-      name: 'Users',
-      description: 'Staff and client account management',
+      name: "Users",
+      description: "Staff and client account management",
     },
     {
-      name: 'Auth',
-      description: 'Authentication, JWT token lifecycle, and MFA',
+      name: "Auth",
+      description: "Authentication, JWT token lifecycle, and MFA",
     },
     {
-      name: 'Clients',
-      description: 'Client profiles, case details, and assigned consultants',
+      name: "Clients",
+      description: "Client profiles, case details, and assigned consultants",
     },
     {
-      name: 'Payment Plans',
-      description: 'Contracted fees, schedules, and installment management',
+      name: "Payment Plans",
+      description: "Contracted fees, schedules, and installment management",
     },
     {
-      name: 'Payments',
-      description: 'Payment records, Stripe checkout, manual entries, and receipts',
+      name: "Payments",
+      description:
+        "Payment records, Stripe checkout, manual entries, and receipts",
     },
     {
-      name: 'Invoices',
-      description: 'Branded PDF invoices, numbering policy, and statements',
+      name: "Invoices",
+      description: "Branded PDF invoices, numbering policy, and statements",
     },
     {
-      name: 'Audit Logs',
-      description: 'Immutable financial and security activity trail',
+      name: "Audit Logs",
+      description: "Immutable financial and security activity trail",
     },
   ],
   components: {
     securitySchemes: {
       bearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Provide JWT token in format: Bearer <token>',
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "JWT",
+        description: "Provide JWT token in format: Bearer <token>",
       },
     },
     schemas: {
       UserRole: {
-        type: 'string',
-        enum: ['SUPER_ADMIN', 'MANAGER', 'CONSULTANT', 'CLIENT'],
+        type: "string",
+        enum: ["SUPER_ADMIN", "MANAGER", "CONSULTANT", "CLIENT"],
       },
       UserStatus: {
-        type: 'string',
-        enum: ['ACTIVE', 'INACTIVE', 'SUSPENDED'],
+        type: "string",
+        enum: ["ACTIVE", "INACTIVE", "SUSPENDED"],
       },
       User: {
-        type: 'object',
+        type: "object",
         properties: {
           id: {
-            type: 'string',
-            format: 'uuid',
-            example: 'c64a3a97-9e48-4384-9a57-0130d2d31c4f',
+            type: "string",
+            format: "uuid",
+            example: "c64a3a97-9e48-4384-9a57-0130d2d31c4f",
           },
           name: {
-            type: 'string',
-            example: 'M. Abir Alam',
+            type: "string",
+            example: "M. Abir Alam",
           },
           email: {
-            type: 'string',
-            format: 'email',
-            example: 'abir@adskill.com',
+            type: "string",
+            format: "email",
+            example: "abir@adskill.com",
           },
           phone: {
-            type: 'string',
+            type: "string",
             nullable: true,
-            example: '+1-416-555-0199',
+            example: "+1-416-555-0199",
           },
           whatsapp: {
-            type: 'string',
+            type: "string",
             nullable: true,
-            example: '+1-416-555-0199',
+            example: "+1-416-555-0199",
           },
           address: {
-            type: 'string',
+            type: "string",
             nullable: true,
-            example: '100 King St W, Suite 5600, Toronto, ON',
+            example: "100 King St W, Suite 5600, Toronto, ON",
           },
           clientId: {
-            type: 'string',
+            type: "string",
             nullable: true,
-            example: 'ASK-2026-0001',
+            example: "ASK-2026-0001",
           },
           isDeleted: {
-            type: 'boolean',
+            type: "boolean",
             example: false,
           },
           role: {
-            $ref: '#/components/schemas/UserRole',
+            $ref: "#/components/schemas/UserRole",
           },
           status: {
-            $ref: '#/components/schemas/UserStatus',
+            $ref: "#/components/schemas/UserStatus",
           },
           isMfaEnabled: {
-            type: 'boolean',
+            type: "boolean",
             example: false,
           },
           createdAt: {
-            type: 'string',
-            format: 'date-time',
-            example: '2026-09-08T18:00:00.000Z',
+            type: "string",
+            format: "date-time",
+            example: "2026-09-08T18:00:00.000Z",
           },
           updatedAt: {
-            type: 'string',
-            format: 'date-time',
-            example: '2026-09-08T18:00:00.000Z',
+            type: "string",
+            format: "date-time",
+            example: "2026-09-08T18:00:00.000Z",
           },
         },
       },
       CreateUserRequest: {
-        type: 'object',
-        required: ['name', 'email', 'password'],
+        type: "object",
+        required: ["name", "email", "password"],
         properties: {
           name: {
-            type: 'string',
-            example: 'John Doe',
+            type: "string",
+            example: "John Doe",
           },
           email: {
-            type: 'string',
-            format: 'email',
-            example: 'john.doe@example.com',
+            type: "string",
+            format: "email",
+            example: "john.doe@example.com",
           },
           password: {
-            type: 'string',
-            format: 'password',
+            type: "string",
+            format: "password",
             minLength: 6,
-            example: 'SecurePassword123!',
+            example: "SecurePassword123!",
           },
           phone: {
-            type: 'string',
-            example: '+1-416-555-0123',
+            type: "string",
+            example: "+1-416-555-0123",
           },
           role: {
-            $ref: '#/components/schemas/UserRole',
-            default: 'CLIENT',
+            $ref: "#/components/schemas/UserRole",
+            default: "CLIENT",
           },
           status: {
-            $ref: '#/components/schemas/UserStatus',
-            default: 'ACTIVE',
+            $ref: "#/components/schemas/UserStatus",
+            default: "ACTIVE",
           },
         },
       },
       UpdateUserRequest: {
-        type: 'object',
+        type: "object",
         properties: {
           name: {
-            type: 'string',
-            example: 'Johnathan Doe',
+            type: "string",
+            example: "Johnathan Doe",
           },
           password: {
-            type: 'string',
-            format: 'password',
+            type: "string",
+            format: "password",
             minLength: 6,
-            example: 'NewSecurePassword123!',
+            example: "NewSecurePassword123!",
           },
           phone: {
-            type: 'string',
-            example: '+1-416-555-9876',
+            type: "string",
+            example: "+1-416-555-9876",
           },
           role: {
-            $ref: '#/components/schemas/UserRole',
+            $ref: "#/components/schemas/UserRole",
           },
           status: {
-            $ref: '#/components/schemas/UserStatus',
+            $ref: "#/components/schemas/UserStatus",
           },
         },
       },
       ErrorSource: {
-        type: 'object',
+        type: "object",
         properties: {
           path: {
-            type: 'string',
-            example: 'email',
+            type: "string",
+            example: "email",
           },
           message: {
-            type: 'string',
-            example: 'Invalid email address format',
+            type: "string",
+            example: "Invalid email address format",
           },
         },
       },
       ApiErrorResponse: {
-        type: 'object',
+        type: "object",
         properties: {
           success: {
-            type: 'boolean',
+            type: "boolean",
             example: false,
           },
           message: {
-            type: 'string',
-            example: 'Validation Error',
+            type: "string",
+            example: "Validation Error",
           },
           errorSources: {
-            type: 'array',
+            type: "array",
             items: {
-              $ref: '#/components/schemas/ErrorSource',
+              $ref: "#/components/schemas/ErrorSource",
             },
           },
           stack: {
-            type: 'string',
+            type: "string",
             nullable: true,
             example: null,
           },
         },
       },
       PaginationMeta: {
-        type: 'object',
+        type: "object",
         properties: {
           page: {
-            type: 'integer',
+            type: "integer",
             example: 1,
           },
           limit: {
-            type: 'integer',
+            type: "integer",
             example: 10,
           },
           total: {
-            type: 'integer',
+            type: "integer",
             example: 45,
           },
           totalPage: {
-            type: 'integer',
+            type: "integer",
             example: 5,
+          },
+        },
+      },
+      RegisterRequest: {
+        type: "object",
+        required: ["name", "email", "password"],
+        properties: {
+          name: { type: "string", example: "Sarah Jenkins" },
+          preferredName: { type: "string", example: "Sarah" },
+          email: {
+            type: "string",
+            format: "email",
+            example: "sarah.jenkins@example.com",
+          },
+          password: {
+            type: "string",
+            format: "password",
+            minLength: 6,
+            example: "SecurePassword123!",
+          },
+          phone: { type: "string", example: "+1-416-555-0199" },
+          whatsapp: { type: "string", example: "+1-416-555-0199" },
+          address: {
+            type: "string",
+            example: "100 King St W, Suite 5600, Toronto, ON",
+          },
+          city: { type: "string", example: "Toronto" },
+          state: { type: "string", example: "ON" },
+          postalCode: { type: "string", example: "M5X 1C9" },
+          country: { type: "string", example: "Canada" },
+          preferredLanguage: { type: "string", default: "en", example: "en" },
+          communicationConsent: {
+            type: "boolean",
+            default: false,
+            example: true,
+          },
+        },
+      },
+      LoginRequest: {
+        type: "object",
+        required: ["email", "password"],
+        properties: {
+          email: {
+            type: "string",
+            format: "email",
+            example: "sarah.jenkins@example.com",
+          },
+          password: {
+            type: "string",
+            format: "password",
+            example: "SecurePassword123!",
           },
         },
       },
     },
   },
   paths: {
-    '/health': {
-      get: {
-        tags: ['Health'],
-        summary: 'Check API server health status',
-        description: 'Returns the current server health, system timestamp, and runtime uptime.',
-        responses: {
-          '200': {
-            description: 'Server is healthy',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    message: {
-                      type: 'string',
-                      example: 'AdSkill PayTrack AI API is running smoothly',
-                    },
-                    data: {
-                      type: 'object',
-                      properties: {
-                        status: { type: 'string', example: 'healthy' },
-                        timestamp: {
-                          type: 'string',
-                          example: '2026-09-08T18:36:18.205Z',
-                        },
-                        uptime: { type: 'number', example: 124.5 },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    },
-    '/users': {
+    "/auth/register": {
       post: {
-        tags: ['Users'],
-        summary: 'Create a new user account',
-        description: 'Creates a new user profile with password hashing and schema validation.',
+        tags: ["Authentication"],
+        summary: "Public client self-registration",
+        description:
+          "Enrolls a new client into AdSkill PayTrack. Automatically sets role to CLIENT and issues a unique Client ID (ASK-YYYY-XXXX).",
         requestBody: {
           required: true,
           content: {
-            'application/json': {
-              schema: {
-                $ref: '#/components/schemas/CreateUserRequest',
-              },
+            "application/json": {
+              schema: { $ref: "#/components/schemas/RegisterRequest" },
             },
           },
         },
         responses: {
-          '201': {
-            description: 'User created successfully',
-            content: {
-              'application/json': {
-                schema: {
-                  type: 'object',
-                  properties: {
-                    success: { type: 'boolean', example: true },
-                    message: {
-                      type: 'string',
-                      example: 'User created successfully',
-                    },
-                    data: {
-                      $ref: '#/components/schemas/User',
-                    },
-                  },
-                },
-              },
-            },
+          "201": {
+            description: "Client registered successfully",
           },
-          '400': {
-            description: 'Validation error',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/ApiErrorResponse',
-                },
-              },
-            },
-          },
-          '409': {
-            description: 'Duplicate email conflict',
-            content: {
-              'application/json': {
-                schema: {
-                  $ref: '#/components/schemas/ApiErrorResponse',
-                },
-              },
-            },
+          "409": {
+            description: "Email already in use",
           },
         },
       },
-      get: {
-        tags: ['Users'],
-        summary: 'Get paginated list of users',
-        description: 'Filter and search through users. Requires SUPER_ADMIN or MANAGER authentication.',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            name: 'searchTerm',
-            in: 'query',
-            description: 'Partial search matching name, email, or phone',
-            required: false,
-            schema: { type: 'string' },
+    },
+    "/auth/login": {
+      post: {
+        tags: ["Authentication"],
+        summary: "User login",
+        description:
+          "Authenticates user with email and password, returning JWT access token and setting HTTP-only refresh token cookie.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/LoginRequest" },
+            },
           },
-          {
-            name: 'role',
-            in: 'query',
-            description: 'Filter by user role',
-            required: false,
-            schema: { $ref: '#/components/schemas/UserRole' },
-          },
-          {
-            name: 'status',
-            in: 'query',
-            description: 'Filter by account status',
-            required: false,
-            schema: { $ref: '#/components/schemas/UserStatus' },
-          },
-          {
-            name: 'page',
-            in: 'query',
-            description: 'Page number (default: 1)',
-            required: false,
-            schema: { type: 'integer', default: 1 },
-          },
-          {
-            name: 'limit',
-            in: 'query',
-            description: 'Items per page (default: 10)',
-            required: false,
-            schema: { type: 'integer', default: 10 },
-          },
-          {
-            name: 'sortBy',
-            in: 'query',
-            description: 'Sort field name (default: createdAt)',
-            required: false,
-            schema: { type: 'string', default: 'createdAt' },
-          },
-          {
-            name: 'sortOrder',
-            in: 'query',
-            description: 'Sort direction (asc or desc, default: desc)',
-            required: false,
-            schema: { type: 'string', enum: ['asc', 'desc'], default: 'desc' },
-          },
-        ],
+        },
         responses: {
-          '200': {
-            description: 'Users retrieved successfully',
+          "200": {
+            description: "Login successful",
+          },
+          "401": {
+            description: "Invalid email or password",
+          },
+        },
+      },
+    },
+    "/auth/refresh-token": {
+      post: {
+        tags: ["Authentication"],
+        summary: "Refresh access token",
+        description:
+          "Generates a new access token using the HTTP-only refresh token cookie.",
+        responses: {
+          "200": {
+            description: "Access token refreshed successfully",
+          },
+          "401": {
+            description: "Invalid or missing refresh token",
+          },
+        },
+      },
+    },
+    "/auth/me": {
+      get: {
+        tags: ["Authentication"],
+        summary: "Get current authenticated user profile",
+        description:
+          "Returns profile, dynamic role, and assigned permissions for the currently logged-in user.",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": {
+            description: "Profile fetched successfully",
+          },
+          "401": {
+            description: "Unauthorized",
+          },
+        },
+      },
+    },
+    "/health": {
+      get: {
+        tags: ["Health"],
+        summary: "Check API server health status",
+        description:
+          "Returns the current server health, system timestamp, and runtime uptime.",
+        responses: {
+          "200": {
+            description: "Server is healthy",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
+                  type: "object",
                   properties: {
-                    success: { type: 'boolean', example: true },
+                    success: { type: "boolean", example: true },
                     message: {
-                      type: 'string',
-                      example: 'Users retrieved successfully',
-                    },
-                    meta: {
-                      $ref: '#/components/schemas/PaginationMeta',
+                      type: "string",
+                      example: "AdSkill PayTrack AI API is running smoothly",
                     },
                     data: {
-                      type: 'array',
-                      items: {
-                        $ref: '#/components/schemas/User',
+                      type: "object",
+                      properties: {
+                        status: { type: "string", example: "healthy" },
+                        timestamp: {
+                          type: "string",
+                          example: "2026-09-08T18:36:18.205Z",
+                        },
+                        uptime: { type: "number", example: 124.5 },
                       },
                     },
                   },
@@ -432,174 +422,321 @@ export const swaggerDocument = {
               },
             },
           },
-          '401': {
-            description: 'Unauthorized (Missing or invalid token)',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ApiErrorResponse' },
-              },
-            },
-          },
-          '403': {
-            description: 'Forbidden (Insufficient role permissions)',
-            content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+        },
+      },
+    },
+    "/users": {
+      post: {
+        tags: ["Users"],
+        summary: "Create a new user account",
+        description:
+          "Creates a new user profile with password hashing and schema validation.",
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/CreateUserRequest",
               },
             },
           },
         },
-      },
-    },
-    '/users/{id}': {
-      get: {
-        tags: ['Users'],
-        summary: 'Get single user by ID',
-        description: 'Retrieves user details by unique identifier.',
-        security: [{ bearerAuth: [] }],
-        parameters: [
-          {
-            name: 'id',
-            in: 'path',
-            required: true,
-            description: 'User UUID',
-            schema: { type: 'string', format: 'uuid' },
-          },
-        ],
         responses: {
-          '200': {
-            description: 'User retrieved successfully',
+          "201": {
+            description: "User created successfully",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
+                  type: "object",
                   properties: {
-                    success: { type: 'boolean', example: true },
+                    success: { type: "boolean", example: true },
                     message: {
-                      type: 'string',
-                      example: 'User retrieved successfully',
+                      type: "string",
+                      example: "User created successfully",
                     },
                     data: {
-                      $ref: '#/components/schemas/User',
+                      $ref: "#/components/schemas/User",
                     },
                   },
                 },
               },
             },
           },
-          '404': {
-            description: 'User not found',
+          "400": {
+            description: "Validation error",
             content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiErrorResponse",
+                },
+              },
+            },
+          },
+          "409": {
+            description: "Duplicate email conflict",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/ApiErrorResponse",
+                },
+              },
+            },
+          },
+        },
+      },
+      get: {
+        tags: ["Users"],
+        summary: "Get paginated list of users",
+        description:
+          "Filter and search through users. Requires SUPER_ADMIN or MANAGER authentication.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "searchTerm",
+            in: "query",
+            description: "Partial search matching name, email, or phone",
+            required: false,
+            schema: { type: "string" },
+          },
+          {
+            name: "role",
+            in: "query",
+            description: "Filter by user role",
+            required: false,
+            schema: { $ref: "#/components/schemas/UserRole" },
+          },
+          {
+            name: "status",
+            in: "query",
+            description: "Filter by account status",
+            required: false,
+            schema: { $ref: "#/components/schemas/UserStatus" },
+          },
+          {
+            name: "page",
+            in: "query",
+            description: "Page number (default: 1)",
+            required: false,
+            schema: { type: "integer", default: 1 },
+          },
+          {
+            name: "limit",
+            in: "query",
+            description: "Items per page (default: 10)",
+            required: false,
+            schema: { type: "integer", default: 10 },
+          },
+          {
+            name: "sortBy",
+            in: "query",
+            description: "Sort field name (default: createdAt)",
+            required: false,
+            schema: { type: "string", default: "createdAt" },
+          },
+          {
+            name: "sortOrder",
+            in: "query",
+            description: "Sort direction (asc or desc, default: desc)",
+            required: false,
+            schema: { type: "string", enum: ["asc", "desc"], default: "desc" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Users retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: {
+                      type: "string",
+                      example: "Users retrieved successfully",
+                    },
+                    meta: {
+                      $ref: "#/components/schemas/PaginationMeta",
+                    },
+                    data: {
+                      type: "array",
+                      items: {
+                        $ref: "#/components/schemas/User",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized (Missing or invalid token)",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiErrorResponse" },
+              },
+            },
+          },
+          "403": {
+            description: "Forbidden (Insufficient role permissions)",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiErrorResponse" },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/users/{id}": {
+      get: {
+        tags: ["Users"],
+        summary: "Get single user by ID",
+        description: "Retrieves user details by unique identifier.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            description: "User UUID",
+            schema: { type: "string", format: "uuid" },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "User retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: { type: "boolean", example: true },
+                    message: {
+                      type: "string",
+                      example: "User retrieved successfully",
+                    },
+                    data: {
+                      $ref: "#/components/schemas/User",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "404": {
+            description: "User not found",
+            content: {
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiErrorResponse" },
               },
             },
           },
         },
       },
       patch: {
-        tags: ['Users'],
-        summary: 'Update user by ID',
-        description: 'Updates specified fields for an existing user account.',
+        tags: ["Users"],
+        summary: "Update user by ID",
+        description: "Updates specified fields for an existing user account.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
-            name: 'id',
-            in: 'path',
+            name: "id",
+            in: "path",
             required: true,
-            description: 'User UUID',
-            schema: { type: 'string', format: 'uuid' },
+            description: "User UUID",
+            schema: { type: "string", format: "uuid" },
           },
         ],
         requestBody: {
           required: true,
           content: {
-            'application/json': {
+            "application/json": {
               schema: {
-                $ref: '#/components/schemas/UpdateUserRequest',
+                $ref: "#/components/schemas/UpdateUserRequest",
               },
             },
           },
         },
         responses: {
-          '200': {
-            description: 'User updated successfully',
+          "200": {
+            description: "User updated successfully",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
+                  type: "object",
                   properties: {
-                    success: { type: 'boolean', example: true },
+                    success: { type: "boolean", example: true },
                     message: {
-                      type: 'string',
-                      example: 'User updated successfully',
+                      type: "string",
+                      example: "User updated successfully",
                     },
                     data: {
-                      $ref: '#/components/schemas/User',
+                      $ref: "#/components/schemas/User",
                     },
                   },
                 },
               },
             },
           },
-          '400': {
-            description: 'Validation error',
+          "400": {
+            description: "Validation error",
             content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiErrorResponse" },
               },
             },
           },
-          '404': {
-            description: 'User not found',
+          "404": {
+            description: "User not found",
             content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiErrorResponse" },
               },
             },
           },
         },
       },
       delete: {
-        tags: ['Users'],
-        summary: 'Delete user by ID',
-        description: 'Permanently removes a user record. Requires SUPER_ADMIN privileges.',
+        tags: ["Users"],
+        summary: "Delete user by ID",
+        description:
+          "Permanently removes a user record. Requires SUPER_ADMIN privileges.",
         security: [{ bearerAuth: [] }],
         parameters: [
           {
-            name: 'id',
-            in: 'path',
+            name: "id",
+            in: "path",
             required: true,
-            description: 'User UUID',
-            schema: { type: 'string', format: 'uuid' },
+            description: "User UUID",
+            schema: { type: "string", format: "uuid" },
           },
         ],
         responses: {
-          '200': {
-            description: 'User deleted successfully',
+          "200": {
+            description: "User deleted successfully",
             content: {
-              'application/json': {
+              "application/json": {
                 schema: {
-                  type: 'object',
+                  type: "object",
                   properties: {
-                    success: { type: 'boolean', example: true },
+                    success: { type: "boolean", example: true },
                     message: {
-                      type: 'string',
-                      example: 'User deleted successfully',
+                      type: "string",
+                      example: "User deleted successfully",
                     },
                     data: {
-                      $ref: '#/components/schemas/User',
+                      $ref: "#/components/schemas/User",
                     },
                   },
                 },
               },
             },
           },
-          '404': {
-            description: 'User not found',
+          "404": {
+            description: "User not found",
             content: {
-              'application/json': {
-                schema: { $ref: '#/components/schemas/ApiErrorResponse' },
+              "application/json": {
+                schema: { $ref: "#/components/schemas/ApiErrorResponse" },
               },
             },
           },

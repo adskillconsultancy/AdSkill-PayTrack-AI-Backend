@@ -1,11 +1,11 @@
-import { NextFunction, Request, Response } from 'express';
-import httpStatus from 'http-status';
-import jwt, { JwtPayload } from 'jsonwebtoken';
-import config from '../config';
-import AppError from '../errors/AppError';
-import prisma from '../lib/prisma';
-import catchAsync from '../shared/catchAsync';
-import { TAuthUser } from '../interface';
+import { NextFunction, Request, Response } from "express";
+import httpStatus from "http-status";
+import jwt, { JwtPayload } from "jsonwebtoken";
+import config from "../config";
+import AppError from "../errors/AppError";
+import prisma from "../lib/prisma";
+import catchAsync from "../shared/catchAsync";
+import { TAuthUser } from "../interface";
 
 /**
  * Permission-Based Access Control (PBAC) Authentication & Authorization Middleware
@@ -24,16 +24,19 @@ const auth = (...requiredPermissions: string[]) => {
 
     // Check token presence
     if (!authHeader) {
-      throw new AppError(httpStatus.UNAUTHORIZED, 'Authentication token required');
+      throw new AppError(
+        httpStatus.UNAUTHORIZED,
+        "Authentication token required",
+      );
     }
 
     // Support standard Bearer token format
-    const token = authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.split(" ")[1]
       : authHeader;
 
     if (!token) {
-      throw new AppError(httpStatus.UNAUTHORIZED, 'Invalid token format');
+      throw new AppError(httpStatus.UNAUTHORIZED, "Invalid token format");
     }
 
     // Verify token
@@ -79,11 +82,11 @@ const auth = (...requiredPermissions: string[]) => {
     if (!user || user.isDeleted || user.role?.isDeleted) {
       throw new AppError(
         httpStatus.UNAUTHORIZED,
-        'User account not found or deactivated',
+        "User account not found or deactivated",
       );
     }
 
-    if (user.status !== 'ACTIVE') {
+    if (user.status !== "ACTIVE") {
       throw new AppError(
         httpStatus.FORBIDDEN,
         `Your account is ${user.status.toLowerCase()}. Please contact support.`,
@@ -95,7 +98,7 @@ const auth = (...requiredPermissions: string[]) => {
       user.role?.rolePermissions.map((rp) => rp.permission.name) || [];
 
     // SUPER_ADMIN has universal unrestricted access across all actions
-    if (userRoleName === 'SUPER_ADMIN') {
+    if (userRoleName === "SUPER_ADMIN") {
       req.user = {
         id: user.id,
         email: user.email,
@@ -115,7 +118,7 @@ const auth = (...requiredPermissions: string[]) => {
       if (!hasPermission) {
         throw new AppError(
           httpStatus.FORBIDDEN,
-          'You do not have permission to perform this action',
+          "You do not have permission to perform this action",
         );
       }
     }
