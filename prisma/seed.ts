@@ -131,11 +131,23 @@ async function main() {
     console.log(`✅ Role seeded: ${upsertedRole.name} (${upsertedRole.id})`);
   }
 
-  // 3. Map Permissions to Roles
+  // 3. Map Permissions to Roles (Reconcile strictly to specification)
   console.log('--- 3. Mapping Permissions to Roles ---');
   for (const [roleName, permissionNames] of Object.entries(ROLE_PERMISSION_MAPPING)) {
     const roleId = roleMap.get(roleName);
     if (!roleId) continue;
+
+    const validPermissionIds = permissionNames
+      .map((name) => permissionMap.get(name))
+      .filter(Boolean) as string[];
+
+    // Remove any permissions no longer assigned to this role per spec
+    await prisma.rolePermission.deleteMany({
+      where: {
+        roleId,
+        permissionId: { notIn: validPermissionIds },
+      },
+    });
 
     for (const permName of permissionNames) {
       const permissionId = permissionMap.get(permName);
