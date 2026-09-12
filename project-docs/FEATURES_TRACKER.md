@@ -30,6 +30,7 @@
 - [x] **Done** — **Role Management API**: `GET /api/v1/roles`, `POST /api/v1/roles`, `GET /api/v1/roles/:id`, `PATCH /api/v1/roles/:id/permissions`, `DELETE /api/v1/roles/:id`.
 - [x] **Done** — **Permission Matrix API**: `GET /api/v1/roles/permissions/all` (grouped by module for admin checkbox grid).
 - [x] **Done** — **User Direct Permissions API**: `GET /api/v1/users/:id/permissions` and `PATCH /api/v1/users/:id/permissions`.
+- [x] **Done** — **DRY Pagination & Filter/Sort Engine**: Centralized `paginationHelper.ts` (DoS-protected limit capping 1-100, default 20) and `filterHelper.ts` (search, date range, whitelist sorting) strictly mandated for all list endpoints.
 - [x] **Done** — **API Documentation**: Full OpenAPI 3.0 specification in `src/docs/swagger.ts`.
 
 ### 🎨 Frontend Implementation (`AdSkill PayTrack AI Frontend`)

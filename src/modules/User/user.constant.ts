@@ -66,4 +66,15 @@ export const userFilterableFields: string[] = [
   "email",
   "country",
   "isDeleted",
+  "startDate",
+  "endDate",
+];
+
+export const userSortableFields: string[] = [
+  "name",
+  "email",
+  "status",
+  "country",
+  "createdAt",
+  "updatedAt",
 ];

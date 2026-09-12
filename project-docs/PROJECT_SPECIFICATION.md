@@ -544,6 +544,10 @@ To maintain financial compliance, legal safety, and ethical AI deployment, AI fe
 - **Localization (i18n):**
   - Explicit date formats (e.g., `September 15, 2026`) and unambiguous currency indicators (`$ USD`).
   - Architecture ready for internationalization: English (default), Bangla, Portuguese, Spanish.
+- **Standardized Pagination & Safe Query Engine (Mandatory):**
+  - All list endpoints across the entire system must strictly use the unified `paginationHelper.ts` and `filterHelper.ts`.
+  - Pagination defaults to `limit: 20` and is strictly capped between `1` and `100` items to prevent DoS memory exhaustion.
+  - Query sorting must be validated against a strict module whitelist; ad-hoc SQL/query concatenations and unvalidated column sorting are strictly prohibited.
 
 ---
 

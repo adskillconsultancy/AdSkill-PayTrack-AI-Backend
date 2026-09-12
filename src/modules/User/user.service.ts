@@ -4,7 +4,18 @@ import httpStatus from "http-status";
 import config from "../../config";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
-import { userSearchableFields } from "./user.constant";
+import { userSearchableFields, userSortableFields } from "./user.constant";
+import {
+  calculatePagination,
+  buildPaginationMeta,
+  IPaginationOptions,
+} from "../../shared/paginationHelper";
+import {
+  buildSearchFilter,
+  buildDateRangeFilter,
+  buildSortOrder,
+  ISortOptions,
+} from "../../shared/filterHelper";
 import {
   TCreateUserPayload,
   TUpdateUserPayload,
@@ -104,20 +115,25 @@ const createUser = async (payload: TCreateUserPayload) => {
 
 const getAllUsers = async (
   filters: TUserFilterRequest,
-  options: {
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-  },
+  paginationOptions?: IPaginationOptions,
+  sortOptions?: ISortOptions,
 ) => {
-  const page = Number(options.page) || 1;
-  const limit = Number(options.limit) || 10;
-  const skip = (page - 1) * limit;
-  const sortBy = options.sortBy || "createdAt";
-  const sortOrder = options.sortOrder || "desc";
+  const { page, limit, skip } = calculatePagination(paginationOptions);
+  const orderBy = buildSortOrder(
+    sortOptions,
+    userSortableFields,
+    "createdAt",
+    "desc",
+  );
 
-  const { searchTerm, roleName, isDeleted, ...filterData } = filters;
+  const {
+    searchTerm,
+    roleName,
+    isDeleted,
+    startDate,
+    endDate,
+    ...filterData
+  } = filters;
   const andConditions: Prisma.UserWhereInput[] = [];
 
   // Default: exclude soft-deleted users unless explicitly requested
@@ -125,16 +141,20 @@ const getAllUsers = async (
     isDeleted: isDeleted !== undefined ? isDeleted : false,
   });
 
-  // Search across designated searchable fields
-  if (searchTerm) {
-    andConditions.push({
-      OR: userSearchableFields.map((field) => ({
-        [field]: {
-          contains: searchTerm,
-          mode: "insensitive",
-        },
-      })),
-    });
+  // Reusable multi-field search
+  const searchCondition = buildSearchFilter(searchTerm, userSearchableFields);
+  if (searchCondition) {
+    andConditions.push(searchCondition);
+  }
+
+  // Reusable date range filter on createdAt
+  const dateRangeCondition = buildDateRangeFilter(
+    "createdAt",
+    startDate,
+    endDate,
+  );
+  if (dateRangeCondition) {
+    andConditions.push(dateRangeCondition);
   }
 
   // Filter by role name if supplied
@@ -168,9 +188,7 @@ const getAllUsers = async (
       where: whereConditions,
       skip,
       take: limit,
-      orderBy: {
-        [sortBy]: sortOrder,
-      },
+      orderBy,
       select: safeUserSelect,
     }),
     prisma.user.count({
@@ -179,12 +197,7 @@ const getAllUsers = async (
   ]);
 
   return {
-    meta: {
-      page,
-      limit,
-      total,
-      totalPage: Math.ceil(total / limit),
-    },
+    meta: buildPaginationMeta(page, limit, total),
     data: users,
   };
 };

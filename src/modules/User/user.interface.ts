@@ -9,6 +9,8 @@ export type TUserFilterRequest = {
   phone?: string;
   country?: string;
   isDeleted?: boolean;
+  startDate?: string;
+  endDate?: string;
 };
 
 export type TCreateUserPayload = {

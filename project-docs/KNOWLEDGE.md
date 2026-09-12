@@ -101,7 +101,9 @@ AdSkill PayTrack AI Backend/
 │   │
 │   └── shared/                    # Reusable cross-cutting utilities
 │       ├── catchAsync.ts          # Higher-order function wrapping async controllers to route errors to next()
-│       └── sendResponse.ts        # Standardized JSON success response envelope
+│       ├── sendResponse.ts        # Standardized JSON success response envelope
+│       ├── paginationHelper.ts    # Reusable pagination math & meta generator with safety caps (DoS protection)
+│       └── filterHelper.ts        # Reusable Prisma text search, date range & safe sort order builders
 │
 ├── .env                           # Local environment secrets (ignored by Git)
 ├── .env.example                   # Environment configuration template for team members
@@ -164,6 +166,125 @@ sendResponse(res, {
   message: 'User retrieved successfully',
   data: result,
 });
+```
+
+---
+
+## 4.1 Mandatory Pagination & Filter Engine (`paginationHelper` & `filterHelper`)
+
+> **CRITICAL ARCHITECTURAL RULE:**  
+> Any endpoint or service that fetches lists of records (Users, Clients, Services, Payments, Invoices, Audit Logs, etc.) **MUST STRICTLY** use the shared `paginationHelper.ts` and `filterHelper.ts`.  
+> Handcrafting ad-hoc `skip`/`take` math, manual query concatenations, or unvalidated sort fields in service files is **STRICTLY FORBIDDEN**.
+
+### 1. `paginationHelper.ts` (`src/shared/paginationHelper.ts`)
+- **`calculatePagination(options)`**:
+  - `page`: default `1`, minimum `1` (`Math.max(1, ...)`).
+  - `limit`: default `20`, capped between `1` and `100` (`Math.max(1, Math.min(100, ...))`) to safeguard against denial-of-service (DoS) memory overload.
+  - `skip`: deterministically calculated as `(page - 1) * limit`.
+  - Returns `{ page, limit, skip }`.
+- **`buildPaginationMeta(page, limit, total)`**:
+  - Automatically calculates `totalPage = Math.ceil(total / limit) || 1`.
+  - Returns `{ page, limit, total, totalPage }` matching the standard `meta` response specification.
+
+### 2. `filterHelper.ts` (`src/shared/filterHelper.ts`)
+- **`buildSearchFilter(searchTerm, searchableFields)`**:
+  - Generates Prisma `{ OR: [{ [field]: { contains: term, mode: "insensitive" } }] }`.
+  - Returns `undefined` if `searchTerm` is empty, avoiding empty Prisma `OR` clauses.
+- **`buildDateRangeFilter(fieldName, startDate, endDate)`**:
+  - Generates `{ [fieldName]: { gte?: Date, lte?: Date } }`.
+  - Automatically handles `YYYY-MM-DD` end-of-day extension (`23:59:59.999`) for accurate day-inclusive queries.
+- **`buildSortOrder(options, allowedSortFields, defaultSortBy, defaultOrder)`**:
+  - Validates `sortBy` against an allowed whitelist array (e.g. `userSortableFields`).
+  - Falls back to `defaultSortBy` (default `"createdAt"`) and `defaultOrder` (default `"desc"`) to prevent SQL injection or invalid column runtime crashes.
+- **`buildExactFilters(filters, excludeKeys)`**:
+  - Generates exact match Prisma clauses for categorical fields (e.g. `status`, `country`, `roleId`).
+
+### 3. Canonical Controller Implementation Standard:
+```ts
+const getAllItems = catchAsync(async (req: Request, res: Response) => {
+  // 1. Extract filter parameters
+  const filters = Object.fromEntries(
+    Object.entries(req.query).filter(([key]) =>
+      itemFilterableFields.includes(key),
+    ),
+  );
+
+  // 2. Extract pagination parameters
+  const paginationOptions = {
+    page: req.query.page as string | undefined,
+    limit: req.query.limit as string | undefined,
+  };
+
+  // 3. Extract sorting parameters
+  const sortOptions = {
+    sortBy: req.query.sortBy as string | undefined,
+    sortOrder: req.query.sortOrder as string | undefined,
+  };
+
+  // 4. Call service
+  const result = await ItemService.getAllItems(filters, paginationOptions, sortOptions);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Items retrieved successfully",
+    meta: result.meta,
+    data: result.data,
+  });
+});
+```
+
+### 4. Canonical Service Implementation Standard:
+```ts
+const getAllItems = async (
+  filters: TItemFilterRequest,
+  paginationOptions?: IPaginationOptions,
+  sortOptions?: ISortOptions,
+) => {
+  // 1. Calculate pagination & sorting via helpers
+  const { page, limit, skip } = calculatePagination(paginationOptions);
+  const orderBy = buildSortOrder(sortOptions, itemSortableFields, "createdAt", "desc");
+
+  // 2. Build where conditions
+  const { searchTerm, startDate, endDate, ...filterData } = filters;
+  const andConditions: Prisma.ItemWhereInput[] = [];
+
+  // Exclude soft-deleted by default
+  andConditions.push({ isDeleted: false });
+
+  // Reusable multi-field search
+  const searchCondition = buildSearchFilter(searchTerm, itemSearchableFields);
+  if (searchCondition) andConditions.push(searchCondition);
+
+  // Reusable date range filter
+  const dateRange = buildDateRangeFilter("createdAt", startDate, endDate);
+  if (dateRange) andConditions.push(dateRange);
+
+  // Exact matches
+  if (Object.keys(filterData).length > 0) {
+    andConditions.push(...buildExactFilters(filterData));
+  }
+
+  const whereConditions: Prisma.ItemWhereInput =
+    andConditions.length > 0 ? { AND: andConditions } : {};
+
+  // 3. Parallel execute query & count
+  const [items, total] = await Promise.all([
+    prisma.item.findMany({
+      where: whereConditions,
+      skip,
+      take: limit,
+      orderBy,
+    }),
+    prisma.item.count({ where: whereConditions }),
+  ]);
+
+  // 4. Return meta & data
+  return {
+    meta: buildPaginationMeta(page, limit, total),
+    data: items,
+  };
+};
 ```
 
 ---

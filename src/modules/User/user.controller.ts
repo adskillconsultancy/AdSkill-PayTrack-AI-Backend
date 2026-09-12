@@ -24,15 +24,23 @@ const getAllUsers = catchAsync(async (req: Request, res: Response) => {
     ),
   );
 
-  // Extract pagination & sorting parameters
-  const options = {
-    page: req.query.page ? Number(req.query.page) : undefined,
-    limit: req.query.limit ? Number(req.query.limit) : undefined,
-    sortBy: req.query.sortBy as string | undefined,
-    sortOrder: req.query.sortOrder as "asc" | "desc" | undefined,
+  // Extract pagination parameters
+  const paginationOptions = {
+    page: req.query.page as string | undefined,
+    limit: req.query.limit as string | undefined,
   };
 
-  const result = await UserService.getAllUsers(filters, options);
+  // Extract sorting parameters
+  const sortOptions = {
+    sortBy: req.query.sortBy as string | undefined,
+    sortOrder: req.query.sortOrder as string | undefined,
+  };
+
+  const result = await UserService.getAllUsers(
+    filters,
+    paginationOptions,
+    sortOptions,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
