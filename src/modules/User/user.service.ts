@@ -257,7 +257,14 @@ const updateUser = async (id: string, payload: TUpdateUserPayload) => {
 };
 
 // Universal Soft Delete implementation (Never hard delete user records)
-const deleteUser = async (id: string) => {
+const deleteUser = async (id: string, currentUserId?: string) => {
+  if (currentUserId && id === currentUserId) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "You cannot delete your own account",
+    );
+  }
+
   // Check if user exists and is not already deleted
   await getUserById(id);
 
