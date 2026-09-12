@@ -105,6 +105,7 @@ const updateUserPermissions = catchAsync(async (req: Request, res: Response) => 
   const result = await UserService.updateUserDirectPermissions(
     id,
     req.body.permissionIds,
+    req.body.deniedPermissionIds,
   );
 
   sendResponse(res, {

@@ -62,6 +62,7 @@ const auth = (...requiredPermissions: string[]) => {
             permission: { isDeleted: false },
           },
           select: {
+            isRevoked: true,
             permission: {
               select: {
                 name: true,
@@ -109,13 +110,20 @@ const auth = (...requiredPermissions: string[]) => {
     const userRoleName = user.role?.name;
     const rolePermissions =
       user.role?.rolePermissions.map((rp) => rp.permission.name) || [];
-    const directUserPermissions =
-      user.userPermissions.map((up) => up.permission.name) || [];
-
-    // Unified Effective Capabilities = Role Permissions + Direct User Overrides
-    const effectivePermissions = Array.from(
-      new Set([...rolePermissions, ...directUserPermissions]),
+    const directGranted =
+      user.userPermissions
+        .filter((up) => !up.isRevoked)
+        .map((up) => up.permission.name) || [];
+    const directRevoked = new Set(
+      user.userPermissions
+        .filter((up) => up.isRevoked)
+        .map((up) => up.permission.name) || [],
     );
+
+    // Unified Effective Capabilities = (Role Permissions + Direct Granted) - Direct Revoked
+    const effectivePermissions = Array.from(
+      new Set([...rolePermissions, ...directGranted]),
+    ).filter((name) => !directRevoked.has(name));
 
     // SUPER_ADMIN has universal unrestricted access across all actions
     if (userRoleName === "SUPER_ADMIN") {

@@ -1,21 +1,21 @@
-import bcryptjs from "bcryptjs";
 import { Prisma } from "@prisma/client";
+import bcryptjs from "bcryptjs";
 import httpStatus from "http-status";
 import config from "../../config";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
-import { userSearchableFields, userSortableFields } from "./user.constant";
 import {
-  calculatePagination,
-  buildPaginationMeta,
-  IPaginationOptions,
-} from "../../shared/paginationHelper";
-import {
-  buildSearchFilter,
   buildDateRangeFilter,
+  buildSearchFilter,
   buildSortOrder,
   ISortOptions,
 } from "../../shared/filterHelper";
+import {
+  buildPaginationMeta,
+  calculatePagination,
+  IPaginationOptions,
+} from "../../shared/paginationHelper";
+import { userSearchableFields, userSortableFields } from "./user.constant";
 import {
   TCreateUserPayload,
   TUpdateUserPayload,
@@ -99,13 +99,68 @@ const createUser = async (payload: TCreateUserPayload) => {
     config.bcrypt_salt_rounds,
   );
 
-  const { roleName, ...userData } = payload;
+  const { roleName, permissionIds, deniedPermissionIds, ...userData } = payload;
+
+  // Validate custom granted permissions if provided
+  if (permissionIds && permissionIds.length > 0) {
+    const validPerms = await prisma.permission.findMany({
+      where: {
+        id: { in: permissionIds },
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+
+    if (validPerms.length !== permissionIds.length) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "One or more provided granted permission IDs are invalid",
+      );
+    }
+  }
+
+  // Validate custom denied permissions if provided
+  if (deniedPermissionIds && deniedPermissionIds.length > 0) {
+    const validDeniedPerms = await prisma.permission.findMany({
+      where: {
+        id: { in: deniedPermissionIds },
+        isDeleted: false,
+      },
+      select: { id: true },
+    });
+
+    if (validDeniedPerms.length !== deniedPermissionIds.length) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "One or more provided denied permission IDs are invalid",
+      );
+    }
+  }
+
+  const userPermsToCreate: { permissionId: string; isRevoked: boolean }[] = [];
+  if (permissionIds && permissionIds.length > 0) {
+    permissionIds.forEach((pid) =>
+      userPermsToCreate.push({ permissionId: pid, isRevoked: false }),
+    );
+  }
+  if (deniedPermissionIds && deniedPermissionIds.length > 0) {
+    deniedPermissionIds.forEach((pid) =>
+      userPermsToCreate.push({ permissionId: pid, isRevoked: true }),
+    );
+  }
 
   const result = await prisma.user.create({
     data: {
       ...userData,
       roleId: targetRoleId,
       password: hashedPassword,
+      ...(userPermsToCreate.length > 0
+        ? {
+            userPermissions: {
+              create: userPermsToCreate,
+            },
+          }
+        : {}),
     },
     select: safeUserSelect,
   });
@@ -126,14 +181,8 @@ const getAllUsers = async (
     "desc",
   );
 
-  const {
-    searchTerm,
-    roleName,
-    isDeleted,
-    startDate,
-    endDate,
-    ...filterData
-  } = filters;
+  const { searchTerm, roleName, isDeleted, startDate, endDate, ...filterData } =
+    filters;
   const andConditions: Prisma.UserWhereInput[] = [];
 
   // Default: exclude soft-deleted users unless explicitly requested
@@ -202,22 +251,28 @@ const getAllUsers = async (
   };
 };
 
-const getUserById = async (id: string) => {
-  const user = await prisma.user.findUnique({
-    where: { id },
+const getUserById = async (idOrClientId: string) => {
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [{ id: idOrClientId }, { clientId: idOrClientId }],
+      isDeleted: false,
+    },
     select: safeUserSelect,
   });
 
-  if (!user || user.isDeleted) {
+  if (!user) {
     throw new AppError(httpStatus.NOT_FOUND, "User not found");
   }
 
   return user;
 };
 
-const updateUser = async (id: string, payload: TUpdateUserPayload) => {
-  // Check if user exists and is not soft deleted
-  await getUserById(id);
+const updateUser = async (
+  idOrClientId: string,
+  payload: TUpdateUserPayload,
+) => {
+  // Check if user exists and is not soft deleted (resolves actual UUID)
+  const existingUser = await getUserById(idOrClientId);
 
   const { roleName, password, ...rest } = payload;
   const updateData: Prisma.UserUpdateInput = { ...rest };
@@ -248,7 +303,7 @@ const updateUser = async (id: string, payload: TUpdateUserPayload) => {
   }
 
   const result = await prisma.user.update({
-    where: { id },
+    where: { id: existingUser.id },
     data: updateData,
     select: safeUserSelect,
   });
@@ -257,19 +312,22 @@ const updateUser = async (id: string, payload: TUpdateUserPayload) => {
 };
 
 // Universal Soft Delete implementation (Never hard delete user records)
-const deleteUser = async (id: string, currentUserId?: string) => {
-  if (currentUserId && id === currentUserId) {
+const deleteUser = async (idOrClientId: string, currentUserId?: string) => {
+  // Check if user exists and is not already deleted (resolves actual UUID)
+  const existingUser = await getUserById(idOrClientId);
+
+  if (
+    currentUserId &&
+    (existingUser.id === currentUserId || idOrClientId === currentUserId)
+  ) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
       "You cannot delete your own account",
     );
   }
 
-  // Check if user exists and is not already deleted
-  await getUserById(id);
-
   const result = await prisma.user.update({
-    where: { id },
+    where: { id: existingUser.id },
     data: {
       isDeleted: true,
       deletedAt: new Date(),
@@ -282,9 +340,12 @@ const deleteUser = async (id: string, currentUserId?: string) => {
 };
 
 // Retrieve effective permissions for an individual user (Role + Direct Overrides)
-const getUserEffectivePermissions = async (userId: string) => {
+const getUserEffectivePermissions = async (idOrClientId: string) => {
   const user = await prisma.user.findFirst({
-    where: { id: userId, isDeleted: false },
+    where: {
+      OR: [{ id: idOrClientId }, { clientId: idOrClientId }],
+      isDeleted: false,
+    },
     select: {
       id: true,
       name: true,
@@ -312,6 +373,7 @@ const getUserEffectivePermissions = async (userId: string) => {
       userPermissions: {
         where: { isDeleted: false, permission: { isDeleted: false } },
         select: {
+          isRevoked: true,
           permission: {
             select: {
               id: true,
@@ -331,14 +393,26 @@ const getUserEffectivePermissions = async (userId: string) => {
 
   const rolePermissions =
     user.role?.rolePermissions.map((rp) => rp.permission) || [];
-  const directPermissions =
-    user.userPermissions.map((up) => up.permission) || [];
+  const grantedDirect =
+    user.userPermissions
+      .filter((up) => !up.isRevoked)
+      .map((up) => up.permission) || [];
+  const revokedDirect = new Set(
+    user.userPermissions
+      .filter((up) => up.isRevoked)
+      .map((up) => up.permission.name),
+  );
 
-  const effectivePermissionNames = Array.from(
+  const combinedPermissions = Array.from(
     new Set([
       ...rolePermissions.map((p) => p.name),
-      ...directPermissions.map((p) => p.name),
+      ...grantedDirect.map((p) => p.name),
     ]),
+  );
+
+  // Strip out any explicitly revoked permissions
+  const effectivePermissionNames = combinedPermissions.filter(
+    (name) => !revokedDirect.has(name),
   );
 
   return {
@@ -348,35 +422,34 @@ const getUserEffectivePermissions = async (userId: string) => {
     clientId: user.clientId,
     role: user.role?.name,
     rolePermissions,
-    directPermissions,
+    directPermissions: grantedDirect,
+    revokedPermissions: user.userPermissions
+      .filter((up) => up.isRevoked)
+      .map((up) => up.permission),
     effectivePermissions: effectivePermissionNames,
   };
 };
 
-// Atomically assign / replace direct user capability overrides
+// Atomically assign / replace direct user capability overrides (both grant and revoke)
 const updateUserDirectPermissions = async (
-  userId: string,
-  permissionIds: string[],
+  idOrClientId: string,
+  permissionIds: string[] = [],
+  deniedPermissionIds: string[] = [],
 ) => {
-  const user = await prisma.user.findFirst({
-    where: { id: userId, isDeleted: false },
-  });
+  const user = await getUserById(idOrClientId);
+  const resolvedUserId = user.id;
 
-  if (!user) {
-    throw new AppError(httpStatus.NOT_FOUND, "User not found");
-  }
-
-  // Validate all provided permission IDs exist
-  if (permissionIds.length > 0) {
+  const allIds = [...new Set([...permissionIds, ...deniedPermissionIds])];
+  if (allIds.length > 0) {
     const validPerms = await prisma.permission.findMany({
       where: {
-        id: { in: permissionIds },
+        id: { in: allIds },
         isDeleted: false,
       },
       select: { id: true },
     });
 
-    if (validPerms.length !== permissionIds.length) {
+    if (validPerms.length !== allIds.length) {
       throw new AppError(
         httpStatus.BAD_REQUEST,
         "One or more provided permission IDs are invalid",
@@ -387,20 +460,37 @@ const updateUserDirectPermissions = async (
   // Atomically replace direct permissions
   await prisma.$transaction(async (tx) => {
     await tx.userPermission.deleteMany({
-      where: { userId },
+      where: { userId: resolvedUserId },
     });
 
-    if (permissionIds.length > 0) {
+    const userPermsToCreate: {
+      userId: string;
+      permissionId: string;
+      isRevoked: boolean;
+    }[] = [];
+    permissionIds.forEach((pid) =>
+      userPermsToCreate.push({
+        userId: resolvedUserId,
+        permissionId: pid,
+        isRevoked: false,
+      }),
+    );
+    deniedPermissionIds.forEach((pid) =>
+      userPermsToCreate.push({
+        userId: resolvedUserId,
+        permissionId: pid,
+        isRevoked: true,
+      }),
+    );
+
+    if (userPermsToCreate.length > 0) {
       await tx.userPermission.createMany({
-        data: permissionIds.map((permissionId) => ({
-          userId,
-          permissionId,
-        })),
+        data: userPermsToCreate,
       });
     }
   });
 
-  return await getUserEffectivePermissions(userId);
+  return await getUserEffectivePermissions(resolvedUserId);
 };
 
 export const UserService = {

@@ -29,6 +29,8 @@ export type TCreateUserPayload = {
   roleName?: string;
   status?: UserStatus;
   clientId?: string;
+  permissionIds?: string[];
+  deniedPermissionIds?: string[];
 };
 
 export type TUpdateUserPayload = Partial<Omit<TCreateUserPayload, "email">>;

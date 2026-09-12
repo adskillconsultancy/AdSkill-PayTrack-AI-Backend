@@ -33,6 +33,7 @@ const authUserSelect = {
   userPermissions: {
     where: { isDeleted: false, permission: { isDeleted: false } },
     select: {
+      isRevoked: true,
       permission: {
         select: {
           name: true,
@@ -70,21 +71,19 @@ const formatAuthUser = (user: any): TAuthUserResponse => {
       (rp: { permission: { name: string } }) => rp.permission.name,
     ) || [];
 
-  const directUserPermissions =
-    user.userPermissions?.map(
-      (up: { permission: { name: string } }) => up.permission.name,
-    ) || [];
+  const directGranted =
+    user.userPermissions
+      ?.filter((up: { isRevoked: boolean; permission: { name: string } }) => !up.isRevoked)
+      .map((up: { isRevoked: boolean; permission: { name: string } }) => up.permission.name) || [];
 
-  const permissions =
-    user.role?.name === "SUPER_ADMIN"
-      ? Array.from(
-          new Set([
-            ...Object.values(PERMISSIONS),
-            ...rolePermissions,
-            ...directUserPermissions,
-          ]),
-        )
-      : Array.from(new Set([...rolePermissions, ...directUserPermissions]));
+  const directRevoked = new Set(
+    user.userPermissions
+      ?.filter((up: { isRevoked: boolean; permission: { name: string } }) => up.isRevoked)
+      .map((up: { isRevoked: boolean; permission: { name: string } }) => up.permission.name) || [],
+  );
+
+  const combinedPerms = Array.from(new Set([...rolePermissions, ...directGranted]));
+  const permissions = combinedPerms.filter((permName) => !directRevoked.has(permName));
 
   return {
     id: user.id,

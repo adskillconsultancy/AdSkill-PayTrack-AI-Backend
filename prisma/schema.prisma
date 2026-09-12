@@ -116,6 +116,7 @@ model UserPermission {
   id           String     @id @default(uuid())
   userId       String
   permissionId String
+  isRevoked    Boolean    @default(false) // false = GRANT (+), true = REVOKE / DENY (-)
   isDeleted    Boolean    @default(false)
   deletedAt    DateTime?
 

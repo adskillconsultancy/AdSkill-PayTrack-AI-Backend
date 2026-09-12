@@ -28,6 +28,8 @@ const createUserValidationSchema = z.object({
     roleName: z.string().optional(),
     status: z.nativeEnum(UserStatus).optional(),
     clientId: z.string().optional(),
+    permissionIds: z.array(z.string().uuid("Invalid permission ID format")).optional(),
+    deniedPermissionIds: z.array(z.string().uuid("Invalid permission ID format")).optional(),
   }),
 });
 
@@ -53,9 +55,8 @@ const updateUserValidationSchema = z.object({
 
 const updateUserPermissionsValidationSchema = z.object({
   body: z.object({
-    permissionIds: z.array(z.string().uuid("Invalid permission ID format"), {
-      required_error: "permissionIds array is required",
-    }),
+    permissionIds: z.array(z.string().uuid("Invalid permission ID format")).optional(),
+    deniedPermissionIds: z.array(z.string().uuid("Invalid permission ID format")).optional(),
   }),
 });
 

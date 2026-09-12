@@ -14,10 +14,14 @@ router.get(
   RoleController.getAllPermissions,
 );
 
-// Get all roles with their assigned permissions
+// Get all roles with their assigned permissions from DB
 router.get(
   "/",
-  auth(PERMISSIONS.USER_MANAGE_ROLE),
+  auth(
+    PERMISSIONS.USER_MANAGE_ROLE,
+    PERMISSIONS.USER_CREATE,
+    PERMISSIONS.USER_READ,
+  ),
   RoleController.getAllRoles,
 );
 
