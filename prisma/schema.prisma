@@ -17,6 +17,14 @@ enum UserStatus {
   SUSPENDED
 }
 
+enum ServiceCategory {
+  IMMIGRATION
+  BUSINESS
+  CONSULTATION
+  DMV_PSB
+  CUSTOM
+}
+
 // ==================== MODELS ====================
 
 // Dynamic User Role model - supports future role expansion
@@ -105,6 +113,10 @@ model User {
   isDeleted            Boolean          @default(false)
   deletedAt            DateTime?
 
+  // Service Audit Relations
+  createdServices      Service[]        @relation("ServiceCreatedBy")
+  updatedServices      Service[]        @relation("ServiceUpdatedBy")
+
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -129,5 +141,38 @@ model UserPermission {
 
   @@unique([userId, permissionId])
   @@map("user_permissions")
+}
+
+// Service Catalog model - represents advisory & legal offerings with strict fee separation
+model Service {
+  id                     String          @id @default(uuid())
+  name                   String          @unique
+  code                   String          @unique // e.g. EB2-NIW, EB1-A, CONSULT-1HR
+  category               ServiceCategory @default(IMMIGRATION)
+  description            String?
+  baseFee                Decimal         @db.Decimal(12, 2) // AdSkill professional fee (revenue)
+  estimatedGovFee        Decimal         @default(0.00) @db.Decimal(12, 2) // USCIS / government filing fees (pass-through)
+  estimatedAttorneyFee   Decimal         @default(0.00) @db.Decimal(12, 2) // Outside legal counsel fees (pass-through)
+  estimatedThirdPartyFee Decimal         @default(0.00) @db.Decimal(12, 2) // Evaluations, translations, business plans (pass-through)
+  currency               String          @default("USD")
+  defaultDeposit         Decimal?        @db.Decimal(12, 2) // Suggested upfront retainer deposit
+  defaultInstallments    Int?            // Suggested milestone installment count
+  estimatedDuration      String?         // Expected completion timeline (e.g. "6-9 months")
+  isActive               Boolean         @default(true)
+
+  // Actor Audit Traceability
+  createdById            String
+  createdBy              User            @relation("ServiceCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedById            String?
+  updatedBy              User?           @relation("ServiceUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  // Universal Soft Delete Policy
+  isDeleted              Boolean         @default(false)
+  deletedAt              DateTime?
+
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  @@map("services")
 }
 

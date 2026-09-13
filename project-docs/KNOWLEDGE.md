@@ -86,9 +86,15 @@ AdSkill PayTrack AI Backend/
 │   │   │   ├── role.service.ts
 │   │   │   ├── role.controller.ts
 │   │   │   └── role.route.ts
+│   │   ├── Service/               # Services catalog, fee categories, and pass-through fee separation (Section 5)
+│   │   │   ├── service.interface.ts
+│   │   │   ├── service.constant.ts
+│   │   │   ├── service.validation.ts
+│   │   │   ├── service.service.ts
+│   │   │   ├── service.controller.ts
+│   │   │   └── service.route.ts
 │   │   │
 │   │   ├── Client/                # [Upcoming] Client profile, agreement, assigned consultant
-│   │   ├── Service/               # [Upcoming] Services catalog & fee categories (Section 5)
 │   │   ├── PaymentPlan/           # [Upcoming] Payment plans, installments, schedule math (Section 6)
 │   │   ├── Payment/               # [Upcoming] Transactions, Stripe webhooks, receipts (Section 7, 13)
 │   │   ├── Invoice/               # [Upcoming] Branded PDF invoices, numbering policy (Section 11)
@@ -343,9 +349,9 @@ const moduleRoutes = [
   { path: '/auth', route: AuthRoutes },
   { path: '/users', route: UserRoutes },
   { path: '/roles', route: RoleRoutes },
+  { path: '/services', route: ServiceRoutes },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
-  // { path: '/services', route: ServiceRoutes },
   // { path: '/payment-plans', route: PaymentPlanRoutes },
   // { path: '/payments', route: PaymentRoutes },
   // { path: '/invoices', route: InvoiceRoutes },

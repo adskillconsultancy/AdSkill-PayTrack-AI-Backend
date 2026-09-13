@@ -3,6 +3,7 @@ import { HealthRoutes } from "../modules/Health/health.route";
 import { UserRoutes } from "../modules/User/user.route";
 import { AuthRoutes } from "../modules/Auth/auth.route";
 import { RoleRoutes } from "../modules/Role/role.route";
+import { ServiceRoutes } from "../modules/Service/service.route";
 
 const router = Router();
 
@@ -23,9 +24,12 @@ const moduleRoutes = [
     path: "/roles",
     route: RoleRoutes,
   },
+  {
+    path: "/services",
+    route: ServiceRoutes,
+  },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
-  // { path: '/services', route: ServiceRoutes },
   // { path: '/payment-plans', route: PaymentPlanRoutes },
   // { path: '/payments', route: PaymentRoutes },
   // { path: '/invoices', route: InvoiceRoutes },

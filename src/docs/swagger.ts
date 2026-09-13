@@ -301,6 +301,81 @@ export const swaggerDocument = {
           },
         },
       },
+      ServiceCategory: {
+        type: "string",
+        enum: ["IMMIGRATION", "BUSINESS", "CONSULTATION", "DMV_PSB", "CUSTOM"],
+      },
+      Service: {
+        type: "object",
+        properties: {
+          id: { type: "string", format: "uuid" },
+          name: { type: "string", example: "EB-2 NIW - National Interest Waiver" },
+          code: { type: "string", example: "EB2-NIW" },
+          category: { $ref: "#/components/schemas/ServiceCategory" },
+          description: { type: "string", nullable: true, example: "Self-petitioned employment-based green card" },
+          baseFee: { type: "number", example: 5000.0 },
+          estimatedGovFee: { type: "number", example: 1015.0 },
+          estimatedAttorneyFee: { type: "number", example: 1500.0 },
+          estimatedThirdPartyFee: { type: "number", example: 500.0 },
+          totalEstimatedCost: { type: "number", example: 8015.0 },
+          currency: { type: "string", example: "USD" },
+          defaultDeposit: { type: "number", nullable: true, example: 1500.0 },
+          defaultInstallments: { type: "integer", nullable: true, example: 4 },
+          estimatedDuration: { type: "string", nullable: true, example: "6-9 months" },
+          isActive: { type: "boolean", example: true },
+          createdById: { type: "string", format: "uuid" },
+          createdBy: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              name: { type: "string" },
+              email: { type: "string" },
+            },
+          },
+          updatedById: { type: "string", format: "uuid", nullable: true },
+          isDeleted: { type: "boolean", example: false },
+          createdAt: { type: "string", format: "date-time" },
+          updatedAt: { type: "string", format: "date-time" },
+        },
+      },
+      CreateServiceRequest: {
+        type: "object",
+        required: ["name", "code", "baseFee"],
+        properties: {
+          name: { type: "string", example: "EB-2 NIW - National Interest Waiver" },
+          code: { type: "string", example: "EB2-NIW" },
+          category: { $ref: "#/components/schemas/ServiceCategory", default: "IMMIGRATION" },
+          description: { type: "string", example: "Comprehensive NIW petition package" },
+          baseFee: { type: "number", example: 5000.0 },
+          estimatedGovFee: { type: "number", default: 0.0, example: 1015.0 },
+          estimatedAttorneyFee: { type: "number", default: 0.0, example: 1500.0 },
+          estimatedThirdPartyFee: { type: "number", default: 0.0, example: 500.0 },
+          currency: { type: "string", default: "USD", example: "USD" },
+          defaultDeposit: { type: "number", example: 1500.0 },
+          defaultInstallments: { type: "integer", example: 4 },
+          estimatedDuration: { type: "string", example: "6-9 months" },
+          isActive: { type: "boolean", default: true },
+        },
+      },
+      UpdateServiceRequest: {
+        type: "object",
+        properties: {
+          name: { type: "string" },
+          code: { type: "string" },
+          category: { $ref: "#/components/schemas/ServiceCategory" },
+          description: { type: "string" },
+          baseFee: { type: "number" },
+          estimatedGovFee: { type: "number" },
+          estimatedAttorneyFee: { type: "number" },
+          estimatedThirdPartyFee: { type: "number" },
+          currency: { type: "string" },
+          defaultDeposit: { type: "number" },
+          defaultInstallments: { type: "integer" },
+          estimatedDuration: { type: "string" },
+          isActive: { type: "boolean" },
+          isDeleted: { type: "boolean" },
+        },
+      },
     },
   },
   paths: {
@@ -987,6 +1062,180 @@ export const swaggerDocument = {
         },
         responses: {
           "200": { description: "Role permissions updated successfully" },
+        },
+      },
+    },
+    "/services": {
+      post: {
+        tags: ["Services"],
+        summary: "Create a new service offering",
+        description:
+          "Registers a new advisory or legal service in the catalog with segregated fee components. Requires 'service:manage' permission (Super Admin).",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/CreateServiceRequest" },
+            },
+          },
+        },
+        responses: {
+          "201": {
+            description: "Service offering created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    statusCode: { type: "integer", example: 201 },
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Service offering created successfully" },
+                    data: { $ref: "#/components/schemas/Service" },
+                  },
+                },
+              },
+            },
+          },
+          "400": { $ref: "#/components/responses/BadRequest" },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+          "409": { description: "Conflict - Service name or code already exists" },
+        },
+      },
+      get: {
+        tags: ["Services"],
+        summary: "Retrieve all service catalog offerings",
+        description:
+          "Fetches a paginated, searchable, and filterable list of active service offerings with fee breakdowns and total cost calculations. Requires 'service:read' permission (Super Admin, Manager, Consultant).",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "searchTerm", in: "query", schema: { type: "string" }, description: "Search by name, code, or description" },
+          { name: "category", in: "query", schema: { $ref: "#/components/schemas/ServiceCategory" } },
+          { name: "currency", in: "query", schema: { type: "string", example: "USD" } },
+          { name: "isActive", in: "query", schema: { type: "boolean" } },
+          { name: "page", in: "query", schema: { type: "integer", default: 1 } },
+          { name: "limit", in: "query", schema: { type: "integer", default: 10 } },
+          { name: "sortBy", in: "query", schema: { type: "string", default: "createdAt" } },
+          { name: "sortOrder", in: "query", schema: { type: "string", enum: ["asc", "desc"], default: "desc" } },
+        ],
+        responses: {
+          "200": {
+            description: "Services retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    statusCode: { type: "integer", example: 200 },
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Services retrieved successfully" },
+                    meta: { $ref: "#/components/schemas/PaginationMeta" },
+                    data: {
+                      type: "array",
+                      items: { $ref: "#/components/schemas/Service" },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "401": { $ref: "#/components/responses/Unauthorized" },
+          "403": { $ref: "#/components/responses/Forbidden" },
+        },
+      },
+    },
+    "/services/{id}": {
+      get: {
+        tags: ["Services"],
+        summary: "Retrieve service by ID",
+        description: "Fetches details of a single service offering by unique ID. Requires 'service:read' permission.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": {
+            description: "Service retrieved successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    statusCode: { type: "integer", example: 200 },
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Service retrieved successfully" },
+                    data: { $ref: "#/components/schemas/Service" },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Service not found" },
+        },
+      },
+      patch: {
+        tags: ["Services"],
+        summary: "Update service details",
+        description: "Updates service details, pricing, duration, or active status. Requires 'service:manage' permission.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/UpdateServiceRequest" },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Service updated successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    statusCode: { type: "integer", example: 200 },
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Service updated successfully" },
+                    data: { $ref: "#/components/schemas/Service" },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Service not found" },
+        },
+      },
+      delete: {
+        tags: ["Services"],
+        summary: "Soft delete a service",
+        description: "Marks a service as deleted. Historical contracts and invoices remain intact. Requires 'service:manage' permission.",
+        security: [{ bearerAuth: [] }],
+        parameters: [
+          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+        ],
+        responses: {
+          "200": {
+            description: "Service soft deleted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    statusCode: { type: "integer", example: 200 },
+                    success: { type: "boolean", example: true },
+                    message: { type: "string", example: "Service soft deleted successfully" },
+                    data: { $ref: "#/components/schemas/Service" },
+                  },
+                },
+              },
+            },
+          },
+          "404": { description: "Service not found" },
         },
       },
     },

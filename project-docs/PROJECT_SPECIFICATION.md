@@ -300,6 +300,30 @@ Administrators can configure catalog services including EB-2 NIW, EB-1A, EB-3, E
 - **Revenue Recognition:**
   - Government and third-party pass-through fees must **not** automatically count as AdSkill earned revenue.
 
+#### 📊 Finalized Service Catalog Data Schema & Fields
+
+| Field Name | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | UUID | Primary Key | Unique system identifier |
+| `name` | String | Unique | Full service title (e.g. `EB-2 NIW - National Interest Waiver`) |
+| `code` | String | Unique | Alphanumeric SKU (e.g. `EB2-NIW`, `EB1-A`, `CONSULT-1HR`) for invoices & search |
+| `category` | Enum | `IMMIGRATION`, `BUSINESS`, `CONSULTATION`, `DMV_PSB`, `CUSTOM` | Classification of service |
+| `description` | Text | Optional | Scope of deliverables and inclusions/exclusions |
+| `baseFee` | Decimal(12, 2) | Required | **AdSkill Professional Fee** (Earned company revenue) |
+| `estimatedGovFee` | Decimal(12, 2) | Default `0.00` | Standard USCIS / government filing fee estimate (**Pass-through**) |
+| `estimatedAttorneyFee` | Decimal(12, 2) | Default `0.00` | Outside legal counsel fee estimate (**Pass-through**) |
+| `estimatedThirdPartyFee`| Decimal(12, 2) | Default `0.00` | Translations, credential evaluations, business plan costs (**Pass-through**) |
+| `currency` | String | Default `USD` | 3-letter currency code |
+| `defaultDeposit` | Decimal(12, 2) | Optional | Recommended upfront retainer deposit upon signing |
+| `defaultInstallments` | Integer | Optional | Recommended milestone installment count (e.g. 3, 4) |
+| `estimatedDuration` | String | Optional | Expected completion timeline (e.g. `6-9 months`) |
+| `isActive` | Boolean | Default `true` | Catalog availability toggle (hides from new plans if false) |
+| `createdById` | UUID | FK -> `users.id` | **Audit Actor:** Staff member who created this service |
+| `updatedById` | UUID | FK -> `users.id` | **Audit Actor:** Staff member who last updated this service |
+| `isDeleted` | Boolean | Default `false` | Universal soft delete flag (preserves plan & invoice integrity) |
+| `deletedAt` | DateTime | Nullable | Soft deletion timestamp |
+| `createdAt` / `updatedAt`| DateTime | System | Automatic audit timestamps |
+
 ---
 
 ### Section 6: Payment Plan Creation

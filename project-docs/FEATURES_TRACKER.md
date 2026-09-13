@@ -179,10 +179,12 @@
 ---
 
 ### Section 5: Services and Fee Separation
-- [ ] **Pending** — Catalog of services: EB-2 NIW, EB-1A, EB-3, E-2, L-1, Family Immigration, Visa Assistance, Business Formation, Consultation, DMV/PSB, Custom.
-- [ ] **Pending** — Strict fee separation: AdSkill professional fees displayed separately from attorney fees, USCIS/government fees, business-plan fees, evaluations, translations, CPA licensing, and third-party expenses.
-- [ ] **Pending** — Separate accounting for discounts, refunds, write-offs, and taxes.
-- [ ] **Pending** — Government and third-party collections must not count as AdSkill revenue.
+- [x] **Done** — Catalog of services: EB-2 NIW, EB-1A, EB-3, E-2, L-1, Family Immigration, Visa Assistance, Business Formation, Consultation, DMV/PSB, Custom (`src/modules/Service/`).
+- [x] **Done** — Strict fee separation: `baseFee` (AdSkill professional fee) segregated from `estimatedGovFee` (USCIS), `estimatedAttorneyFee`, and `estimatedThirdPartyFee` (translations, evaluations, business plans).
+- [x] **Done** — Actor traceability: `createdById` and `updatedById` linking to `User` table for full administrative accountability.
+- [x] **Done** — Decimal(12, 2) fixed precision: zero floating-point arithmetic.
+- [ ] **Pending** — Separate accounting for discounts, refunds, write-offs, and taxes (implemented in Payment Plan & Payment modules).
+- [x] **Done** — Revenue recognition rule: Pass-through fees explicitly separated from company revenue calculations.
 
 ---
 
