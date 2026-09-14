@@ -139,8 +139,14 @@ const getAllServices = async (
   const andConditions: Prisma.ServiceWhereInput[] = [];
 
   // Default: exclude soft-deleted services unless explicitly requested
+  const isDeletedBool =
+    isDeleted !== undefined
+      ? typeof isDeleted === "string"
+        ? isDeleted === "true"
+        : Boolean(isDeleted)
+      : false;
   andConditions.push({
-    isDeleted: isDeleted !== undefined ? isDeleted : false,
+    isDeleted: isDeletedBool,
   });
 
   // Reusable multi-field search (name, code, description)
@@ -161,7 +167,9 @@ const getAllServices = async (
 
   // Filter by active status
   if (isActive !== undefined) {
-    andConditions.push({ isActive });
+    const isActiveBool =
+      typeof isActive === "string" ? isActive === "true" : Boolean(isActive);
+    andConditions.push({ isActive: isActiveBool });
   }
 
   // Date range filter on createdAt
