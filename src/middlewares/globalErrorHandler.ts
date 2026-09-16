@@ -3,6 +3,7 @@ import { ZodError } from "zod";
 import { Prisma } from "@prisma/client";
 import { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import httpStatus from "http-status";
+import multer from "multer";
 import config from "../config";
 import AppError from "../errors/AppError";
 import handleZodError from "../errors/handleZodError";
@@ -78,7 +79,18 @@ const globalErrorHandler: ErrorRequestHandler = (err, req, res, next) => {
       },
     ];
   }
-  // 7. General JavaScript Error
+  // 7. Multer Upload Error
+  else if (err instanceof multer.MulterError) {
+    statusCode = httpStatus.BAD_REQUEST;
+    message = err.message;
+    errorSources = [
+      {
+        path: err.field || "file",
+        message: err.message,
+      },
+    ];
+  }
+  // 8. General JavaScript Error
   else if (err instanceof Error) {
     message = err.message;
     errorSources = [

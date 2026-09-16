@@ -4,6 +4,7 @@ import { UserRoutes } from "../modules/User/user.route";
 import { AuthRoutes } from "../modules/Auth/auth.route";
 import { RoleRoutes } from "../modules/Role/role.route";
 import { ServiceRoutes } from "../modules/Service/service.route";
+import { UploadRoutes } from "../modules/Upload/upload.route";
 
 const router = Router();
 
@@ -27,6 +28,10 @@ const moduleRoutes = [
   {
     path: "/services",
     route: ServiceRoutes,
+  },
+  {
+    path: "/uploads",
+    route: UploadRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
