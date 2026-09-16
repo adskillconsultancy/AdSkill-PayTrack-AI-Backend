@@ -250,11 +250,16 @@ const getAllServices = async (
   return { meta, data };
 };
 
-const getServiceById = async (id: string) => {
+const getServiceById = async (identifier: string) => {
+  const normalizedIdentifier = identifier.trim();
+
   const service = await prisma.service.findFirst({
     where: {
-      id,
       isDeleted: false,
+      OR: [
+        { id: normalizedIdentifier },
+        { code: { equals: normalizedIdentifier, mode: "insensitive" } },
+      ],
     },
     select: serviceSelect,
   });

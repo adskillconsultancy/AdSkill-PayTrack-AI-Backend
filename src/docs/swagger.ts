@@ -1148,11 +1148,11 @@ export const swaggerDocument = {
     "/services/{id}": {
       get: {
         tags: ["Services"],
-        summary: "Retrieve service by ID",
-        description: "Fetches details of a single service offering by unique ID. Requires 'service:read' permission.",
+        summary: "Retrieve service by ID or code",
+        description: "Fetches details of a single service offering by UUID or unique service code. Requires 'service:read' permission.",
         security: [{ bearerAuth: [] }],
         parameters: [
-          { name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } },
+          { name: "id", in: "path", required: true, schema: { type: "string" }, example: "EB2-NIW", description: "Service UUID or unique service code" },
         ],
         responses: {
           "200": {
