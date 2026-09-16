@@ -7,9 +7,6 @@ const createServiceValidationSchema = z.object({
     name: z.string({
       required_error: "Service name is required",
     }).min(2, "Service name must be at least 2 characters"),
-    code: z.string({
-      required_error: "Service code / SKU is required",
-    }).min(2, "Service code must be at least 2 characters"),
     category: z.nativeEnum(ServiceCategory).optional(),
     description: z.string().optional(),
     baseFee: z

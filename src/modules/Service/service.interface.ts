@@ -12,7 +12,7 @@ export type TServiceFilterRequest = {
 
 export type TCreateServicePayload = {
   name: string;
-  code: string;
+  code?: string;
   category?: ServiceCategory;
   description?: string;
   baseFee: number;

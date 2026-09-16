@@ -22,6 +22,7 @@ router.get(
   ServiceController.getAllServices,
 );
 
+
 // Get single service by ID (Requires 'service:read' permission)
 router.get(
   "/:id",

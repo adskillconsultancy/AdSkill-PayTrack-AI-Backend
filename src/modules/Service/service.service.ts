@@ -74,32 +74,80 @@ const withTotalCost = (service: any) => {
   };
 };
 
+/**
+ * Generates simple SKU based on service name + random number (e.g. eb2 -> EB2-011223)
+ */
+const generateSKU = async (name: string): Promise<string> => {
+  const cleanPrefix =
+    name
+      .trim()
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .slice(0, 6)
+      .toUpperCase() || "SRV";
+
+  let isUnique = false;
+  let sku = "";
+  let attempts = 0;
+
+  while (!isUnique && attempts < 10) {
+    attempts++;
+    const random = Math.floor(100000 + Math.random() * 900000);
+    sku = `${cleanPrefix}-${random}`;
+
+    const existing = await prisma.service.findFirst({
+      where: { code: sku, isDeleted: false },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      isUnique = true;
+    }
+  }
+
+  return sku || `${cleanPrefix}-${Date.now().toString().slice(-6)}`;
+};
+
 const createService = async (payload: TCreateServicePayload, actorId: string) => {
-  // Check unique constraints for name and code
-  const existingService = await prisma.service.findFirst({
+  // Check unique constraints for name
+  const existingByName = await prisma.service.findFirst({
     where: {
-      OR: [{ name: payload.name }, { code: payload.code.toUpperCase() }],
+      name: { equals: payload.name.trim(), mode: "insensitive" },
       isDeleted: false,
     },
   });
 
-  if (existingService) {
-    if (existingService.code.toUpperCase() === payload.code.toUpperCase()) {
-      throw new AppError(
-        httpStatus.CONFLICT,
-        `A service with code "${payload.code.toUpperCase()}" already exists`,
-      );
-    }
+  if (existingByName) {
     throw new AppError(
       httpStatus.CONFLICT,
-      `A service with name "${payload.name}" already exists`,
+      `A service with name "${payload.name.trim()}" already exists`,
     );
+  }
+
+  // Resolve SKU: use custom code if provided, otherwise generate from name (e.g. EB2-482019)
+  let finalCode = payload.code?.trim().toUpperCase();
+
+  if (!finalCode) {
+    finalCode = await generateSKU(payload.name);
+  } else {
+    const existingByCode = await prisma.service.findFirst({
+      where: {
+        code: { equals: finalCode, mode: "insensitive" },
+        isDeleted: false,
+      },
+    });
+
+    if (existingByCode) {
+      throw new AppError(
+        httpStatus.CONFLICT,
+        `A service with code "${finalCode}" already exists`,
+      );
+    }
   }
 
   const result = await prisma.service.create({
     data: {
-      name: payload.name,
-      code: payload.code.toUpperCase(),
+      name: payload.name.trim(),
+      code: finalCode,
       category: payload.category || "IMMIGRATION",
       description: payload.description,
       baseFee: new Prisma.Decimal(payload.baseFee),
