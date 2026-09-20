@@ -57,6 +57,12 @@ enum DocumentScanStatus {
   REJECTED
 }
 
+enum NoteVisibility {
+  CLIENT
+  STAFF
+  SUPER_ADMIN
+}
+
 // ==================== MODELS ====================
 
 // Dynamic User Role model - supports future role expansion
@@ -154,6 +160,7 @@ model User {
   documents            Document[]       @relation("DocumentOwner")
   verifiedPayments     Payment[]        @relation("PaymentVerifiedBy")
   auditLogs            AuditLog[]
+  caseNotes            CaseNote[]       @relation("CaseNoteAuthor")
 
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
@@ -234,6 +241,7 @@ model ClientCase {
   financialStatus       FinancialStatus @default(UNPAID)
   clientVisibleNotes    String?
   internalNotes         String?
+  superAdminNotes       String?
   isDeleted             Boolean        @default(false)
   deletedAt             DateTime?
   closedAt              DateTime?
@@ -246,6 +254,7 @@ model ClientCase {
   payments              Payment[]
   invoices              Invoice[]
   receipts              Receipt[]
+  caseNotes             CaseNote[]
 
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
@@ -254,6 +263,28 @@ model ClientCase {
   @@index([serviceId])
   @@map("client_cases")
 }
+
+model CaseNote {
+  id         String         @id @default(uuid())
+  caseId     String
+  authorId   String
+  content    String         // Rich HTML formatted content
+  visibility NoteVisibility @default(STAFF)
+  isPinned   Boolean        @default(false)
+  isDeleted  Boolean        @default(false)
+  deletedAt  DateTime?
+
+  case       ClientCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author     User           @relation("CaseNoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@index([caseId, visibility, isDeleted])
+  @@index([authorId, isDeleted])
+  @@map("case_notes")
+}
+
 
 model PaymentPlan {
   id                    String   @id @default(uuid())

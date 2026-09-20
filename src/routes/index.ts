@@ -10,6 +10,7 @@ import { PaymentPlanRoutes } from "../modules/PaymentPlan/payment-plan.route";
 import { PaymentRoutes } from "../modules/Payment/payment.route";
 import { InvoiceRoutes } from "../modules/Invoice/invoice.route";
 import { ReceiptRoutes } from "../modules/Receipt/receipt.route";
+import { CaseNoteRoutes } from "../modules/CaseNote/case-note.route";
 
 const router = Router();
 
@@ -57,6 +58,10 @@ const moduleRoutes = [
   {
     path: "/receipts",
     route: ReceiptRoutes,
+  },
+  {
+    path: "/case-notes",
+    route: CaseNoteRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },

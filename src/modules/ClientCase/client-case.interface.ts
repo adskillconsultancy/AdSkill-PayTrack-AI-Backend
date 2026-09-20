@@ -8,6 +8,8 @@ export type TCreateClientCasePayload = {
   agreementDate?: string;
   serviceStartDate?: string;
   clientVisibleNotes?: string;
+  internalNotes?: string;
+  superAdminNotes?: string;
 };
 
 export type TUpdateClientCasePayload = {
@@ -19,5 +21,6 @@ export type TUpdateClientCasePayload = {
   caseStatus?: CaseStatus;
   clientVisibleNotes?: string;
   internalNotes?: string;
+  superAdminNotes?: string;
   assignedConsultantId?: string | null;
 };

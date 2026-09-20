@@ -11,7 +11,9 @@ const createClientCaseValidationSchema = z.object({
     caseSubcategory: z.string().trim().min(2).max(100).optional(),
     agreementDate: optionalDate,
     serviceStartDate: optionalDate,
-    clientVisibleNotes: z.string().trim().max(5000).optional(),
+    clientVisibleNotes: z.string().trim().max(10000).optional(),
+    internalNotes: z.string().trim().max(20000).optional(),
+    superAdminNotes: z.string().trim().max(20000).optional(),
   }),
 });
 
@@ -24,8 +26,9 @@ const updateClientCaseValidationSchema = z.object({
     agreementDate: optionalDate,
     serviceStartDate: optionalDate,
     caseStatus: z.nativeEnum(CaseStatus).optional(),
-    clientVisibleNotes: z.string().trim().max(5000).optional(),
-    internalNotes: z.string().trim().max(10000).optional(),
+    clientVisibleNotes: z.string().trim().max(10000).optional(),
+    internalNotes: z.string().trim().max(20000).optional(),
+    superAdminNotes: z.string().trim().max(20000).optional(),
     assignedConsultantId: z.string().uuid().nullable().optional(),
   }),
 });

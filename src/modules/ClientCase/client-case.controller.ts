@@ -8,7 +8,7 @@ const isStaff = (req: Request) => req.user?.role !== "CLIENT";
 
 
 const createClientCase = catchAsync(async (req: Request, res: Response) => {
-  const result = await ClientCaseService.createClientCase(req.body, req.user!.id);
+  const result = await ClientCaseService.createClientCase(req.body, req.user!.id, req.user?.role);
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -18,7 +18,7 @@ const createClientCase = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getMyCases = catchAsync(async (req: Request, res: Response) => {
-  const result = await ClientCaseService.getCasesForUser(req.user!.id);
+  const result = await ClientCaseService.getCasesForUser(req.user!.id, req.user?.role);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -28,7 +28,7 @@ const getMyCases = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getCaseById = catchAsync(async (req: Request, res: Response) => {
-  const result = await ClientCaseService.getCaseById(req.params.id, req.user!.id, isStaff(req));
+  const result = await ClientCaseService.getCaseById(req.params.id, req.user!.id, isStaff(req), req.user?.role);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -43,6 +43,7 @@ const updateCase = catchAsync(async (req: Request, res: Response) => {
     req.body,
     req.user!.id,
     isStaff(req),
+    req.user?.role,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
