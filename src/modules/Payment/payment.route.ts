@@ -7,6 +7,11 @@ import { PaymentValidation } from "./payment.validation";
 
 const router = Router();
 
+router.get(
+  "/",
+  auth(PERMISSIONS.PAYMENT_READ),
+  PaymentController.getAllPayments,
+);
 router.post(
   "/",
   auth(PERMISSIONS.PAYMENT_PAY, PERMISSIONS.PAYMENT_RECORD),

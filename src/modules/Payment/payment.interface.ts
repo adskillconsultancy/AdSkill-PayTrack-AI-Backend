@@ -10,4 +10,12 @@ export type TCreatePaymentPayload = {
   externalReference?: string;
   idempotencyKey?: string;
   operationalNotes?: string;
+  proofDocumentIds?: string[];
+};
+export type TPaymentFilters = {
+  status?: string;
+  paymentMethod?: string;
+  searchTerm?: string;
+  startDate?: string;
+  endDate?: string;
 };

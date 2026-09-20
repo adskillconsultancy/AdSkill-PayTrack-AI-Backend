@@ -26,4 +26,30 @@ const verifyPayment = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payment verified successfully", data: result });
 });
 
-export const PaymentController = { createPayment, listPayments, getPaymentById, verifyPayment };
+const getAllPayments = catchAsync(async (req: Request, res: Response) => {
+  const result = await PaymentService.getAllPayments(
+    req.query as any,
+    req.user!.id,
+    isStaff(req),
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Payments retrieved successfully",
+    meta: {
+      page: 1,
+      limit: result.payments.length,
+      total: result.stats.totalTransactions,
+    },
+    data: result,
+  });
+});
+
+export const PaymentController = {
+  createPayment,
+  listPayments,
+  getPaymentById,
+  verifyPayment,
+  getAllPayments,
+};
+

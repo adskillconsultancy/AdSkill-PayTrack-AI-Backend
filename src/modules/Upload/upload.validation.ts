@@ -5,6 +5,7 @@ const caseDocumentsValidationSchema = z.object({
   params: z.object({ caseId: z.string().uuid("Invalid case ID") }),
   body: z.object({
     documentType: z.nativeEnum(DocumentType).optional(),
+    paymentId: z.string().uuid("Invalid payment ID").optional(),
   }),
 });
 

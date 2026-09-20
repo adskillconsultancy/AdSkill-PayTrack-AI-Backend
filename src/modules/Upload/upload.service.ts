@@ -47,9 +47,15 @@ const createCaseDocumentKey = (
   caseCode: string,
   documentId: string,
   originalName: string,
+  documentType?: string,
 ) => {
   const safeClientId = (clientId || "CLIENT").replace(/[^a-zA-Z0-9_-]/g, "-");
   const safeCaseCode = caseCode.replace(/[^a-zA-Z0-9_-]/g, "-");
+  if (documentType === "PAYMENT_PROOF") {
+    const ext = originalName.includes(".") ? originalName.split(".").pop() : "bin";
+    const timestamp = Date.now();
+    return `${UPLOAD_FOLDERS.DOCUMENTS}/${safeClientId}/${safeCaseCode}/payment_${safeClientId}-${timestamp}.${ext}`;
+  }
   return `${UPLOAD_FOLDERS.DOCUMENTS}/${safeClientId}/${safeCaseCode}/${documentId}-${sanitizeFileName(originalName)}`;
 };
 
@@ -80,6 +86,7 @@ const uploadCaseDocuments = async (
   caseId: string,
   actorId: string,
   documentType: "AGREEMENT" | "INVOICE" | "RECEIPT" | "PAYMENT_PROOF" | "IDENTITY" | "SUPPORTING" | "OTHER" = "SUPPORTING",
+  paymentId?: string,
 ): Promise<TUploadedDocument[]> => {
   if (!files.length) throw new AppError(httpStatus.BAD_REQUEST, "At least one document file is required");
   const staff = await isStaffActor(actorId);
@@ -97,7 +104,7 @@ const uploadCaseDocuments = async (
     for (const file of files) {
       ensureSafeFile(file);
       const documentId = crypto.randomUUID();
-      const key = createCaseDocumentKey(clientCase.user.clientId, clientCase.caseCode, documentId, file.originalname);
+      const key = createCaseDocumentKey(clientCase.user.clientId, clientCase.caseCode, documentId, file.originalname, documentType);
       const uploadResult = await uploadPrivateObject({
         key,
         body: file.buffer,
@@ -105,15 +112,19 @@ const uploadCaseDocuments = async (
         metadata: { uploadedBy: actorId, caseId, documentId, originalName: sanitizeFileName(file.originalname) },
       });
       uploadedKeys.push(key);
+      const storedName = documentType === "PAYMENT_PROOF"
+        ? key.split("/").pop() || `${documentId}-${sanitizeFileName(file.originalname)}`
+        : `${documentId}-${sanitizeFileName(file.originalname)}`;
       const document = await prisma.document.create({
         data: {
           id: documentId,
           userId: clientCase.userId,
           caseId,
+          paymentId: paymentId || undefined,
           documentType,
           objectKey: key,
           bucket: uploadResult.bucket,
-          storedName: `${documentId}-${sanitizeFileName(file.originalname)}`,
+          storedName,
           originalName: file.originalname,
           mimeType: file.mimetype,
           size: file.size,

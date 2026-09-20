@@ -21,6 +21,7 @@ const uploadCaseDocuments = catchAsync(async (req: Request, res: Response) => {
     req.params.caseId,
     req.user!.id,
     req.body.documentType,
+    req.body.paymentId,
   );
 
   sendResponse(res, {
