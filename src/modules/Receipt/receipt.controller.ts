@@ -1,0 +1,10 @@
+import { Request, Response } from "express";
+import httpStatus from "http-status";
+import catchAsync from "../../shared/catchAsync";
+import sendResponse from "../../shared/sendResponse";
+import { ReceiptService } from "./receipt.service";
+const staff = (req: Request) => req.user?.role !== "CLIENT";
+const createReceipt = catchAsync(async (req: Request, res: Response) => { const data = await ReceiptService.createReceipt(req.params.paymentId, req.user!.id); sendResponse(res, { statusCode: httpStatus.CREATED, success: true, message: "Receipt generated successfully", data }); });
+const listReceipts = catchAsync(async (req: Request, res: Response) => { const data = await ReceiptService.listReceipts(req.params.caseId, req.user!.id, staff(req)); sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipts retrieved successfully", data }); });
+const getReceipt = catchAsync(async (req: Request, res: Response) => { const data = await ReceiptService.getReceipt(req.params.id, req.user!.id, staff(req)); sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipt retrieved successfully", data }); });
+export const ReceiptController = { createReceipt, listReceipts, getReceipt };

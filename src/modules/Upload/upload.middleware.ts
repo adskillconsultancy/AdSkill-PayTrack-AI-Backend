@@ -10,6 +10,7 @@ const upload = multer({
   storage,
   limits: {
     fileSize: config.r2.max_file_size_mb * 1024 * 1024,
+    files: 10,
   },
   fileFilter: (req, file, callback) => {
     if (!UPLOAD_ALLOWED_MIME_TYPES.includes(file.mimetype)) {

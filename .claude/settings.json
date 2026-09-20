@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "C:\\AdSkill\\AI Client Payment Tracker\\AdSkill PayTrack AI Frontend\\src\\services\\api\\documents",
+      "C:\\AdSkill\\AI Client Payment Tracker\\AdSkill PayTrack AI Frontend\\src\\features\\clients\\components"
+    ]
+  }
+}

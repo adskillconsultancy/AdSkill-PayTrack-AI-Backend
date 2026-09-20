@@ -16,6 +16,11 @@ export const CANONICAL_PERMISSIONS = [
   { name: 'service:read', module: 'SERVICE', description: 'View services and base fees' },
   { name: 'service:manage', module: 'SERVICE', description: 'Create and edit service catalog offerings' },
 
+  // Client Cases
+  { name: 'case:create', module: 'CASE', description: 'Create client service cases' },
+  { name: 'case:read', module: 'CASE', description: 'View client service cases' },
+  { name: 'case:manage', module: 'CASE', description: 'Manage assigned client service cases' },
+
   // Payment Plans
   { name: 'plan:read', module: 'PLAN', description: 'View client payment plans and installment milestones' },
   { name: 'plan:create', module: 'PLAN', description: 'Create contracted payment plans' },
@@ -35,6 +40,11 @@ export const CANONICAL_PERMISSIONS = [
   { name: 'receipt:read', module: 'RECEIPT', description: 'View and download payment receipts' },
   { name: 'receipt:generate', module: 'RECEIPT', description: 'Generate official sequential PDF receipts' },
 
+  // Documents
+  { name: 'document:read', module: 'DOCUMENT', description: 'View private case documents' },
+  { name: 'document:upload', module: 'DOCUMENT', description: 'Upload private case documents' },
+  { name: 'document:delete', module: 'DOCUMENT', description: 'Remove private case documents' },
+
   // Reports & Financial Intelligence
   { name: 'report:view', module: 'REPORT', description: 'View management dashboard financial metrics' },
   { name: 'report:export', module: 'REPORT', description: 'Export financial reports to CSV, Excel, or PDF' },
@@ -53,6 +63,11 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'user:create',
     'user:update',
     'service:read',
+    'case:read',
+    'case:manage',
+    'document:read',
+    'document:upload',
+    'document:delete',
     'plan:read',
     'plan:create',
     'plan:update',
@@ -72,6 +87,9 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
   CONSULTANT: [
     'user:read',
     'service:read',
+    'case:read',
+    'case:manage',
+    'document:read',
     'plan:read',
     'payment:read',
     'invoice:read',
@@ -82,6 +100,10 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
   ],
   CLIENT: [
     'user:read',
+    'case:create',
+    'case:read',
+    'document:read',
+    'document:upload',
     'plan:read',
     'payment:read',
     'payment:pay',

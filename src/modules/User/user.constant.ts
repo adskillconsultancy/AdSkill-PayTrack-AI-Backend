@@ -20,6 +20,12 @@ export const PERMISSIONS = {
   SERVICE_READ: "service:read",
   SERVICE_MANAGE: "service:manage",
 
+  // Client Cases
+  CASE_CREATE: "case:create",
+  CASE_READ: "case:read",
+  CASE_UPDATE: "case:update",
+  CASE_MANAGE: "case:manage",
+
   // Payment Plans
   PLAN_READ: "plan:read",
   PLAN_CREATE: "plan:create",
@@ -38,6 +44,11 @@ export const PERMISSIONS = {
   INVOICE_GENERATE: "invoice:generate",
   RECEIPT_READ: "receipt:read",
   RECEIPT_GENERATE: "receipt:generate",
+
+  // Documents
+  DOCUMENT_READ: "document:read",
+  DOCUMENT_UPLOAD: "document:upload",
+  DOCUMENT_DELETE: "document:delete",
 
   // Reports
   REPORT_VIEW: "report:view",

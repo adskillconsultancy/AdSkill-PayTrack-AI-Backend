@@ -5,6 +5,11 @@ import { AuthRoutes } from "../modules/Auth/auth.route";
 import { RoleRoutes } from "../modules/Role/role.route";
 import { ServiceRoutes } from "../modules/Service/service.route";
 import { UploadRoutes } from "../modules/Upload/upload.route";
+import { ClientCaseRoutes } from "../modules/ClientCase/client-case.route";
+import { PaymentPlanRoutes } from "../modules/PaymentPlan/payment-plan.route";
+import { PaymentRoutes } from "../modules/Payment/payment.route";
+import { InvoiceRoutes } from "../modules/Invoice/invoice.route";
+import { ReceiptRoutes } from "../modules/Receipt/receipt.route";
 
 const router = Router();
 
@@ -32,6 +37,26 @@ const moduleRoutes = [
   {
     path: "/uploads",
     route: UploadRoutes,
+  },
+  {
+    path: "/client-cases",
+    route: ClientCaseRoutes,
+  },
+  {
+    path: "/payment-plans",
+    route: PaymentPlanRoutes,
+  },
+  {
+    path: "/payments",
+    route: PaymentRoutes,
+  },
+  {
+    path: "/invoices",
+    route: InvoiceRoutes,
+  },
+  {
+    path: "/receipts",
+    route: ReceiptRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
