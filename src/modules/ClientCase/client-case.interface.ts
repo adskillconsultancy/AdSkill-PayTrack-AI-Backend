@@ -8,6 +8,8 @@ export type TCreateClientCasePayload = {
   caseSubcategory?: string;
   agreementDate?: string;
   serviceStartDate?: string;
+  assignedConsultantId?: string | null;
+  caseStatus?: CaseStatus;
   clientVisibleNotes?: string;
   internalNotes?: string;
   superAdminNotes?: string;

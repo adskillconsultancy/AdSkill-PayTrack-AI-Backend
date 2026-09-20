@@ -1239,5 +1239,41 @@ export const swaggerDocument = {
         },
       },
     },
+    "/reports": {
+      post: {
+        tags: ["Reports"],
+        summary: "Generate executive financial and management report",
+        description: "Executes financial aggregation and returns executive KPI cards and itemized client case performance records. Exclusively accessible by SUPER_ADMIN.",
+        security: [{ bearerAuth: [] }],
+        requestBody: {
+          required: false,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  searchTerm: { type: "string", example: "EB2" },
+                  category: { type: "string", enum: ["ALL", "IMMIGRATION", "BUSINESS", "CONSULTATION", "DMV_PSB", "CUSTOM"], example: "ALL" },
+                  financialStatus: { type: "string", enum: ["ALL", "UNPAID", "PARTIALLY_PAID", "PAID", "OVERDUE"], example: "ALL" },
+                  startDate: { type: "string", format: "date", example: "2026-01-01" },
+                  endDate: { type: "string", format: "date", example: "2026-12-31" },
+                  sortBy: { type: "string", enum: ["createdAt", "agreementDate", "contractedFee", "totalPaid", "outstandingBalance", "clientName"], example: "createdAt" },
+                  sortOrder: { type: "string", enum: ["asc", "desc"], example: "desc" },
+                  page: { type: "integer", example: 1 },
+                  limit: { type: "integer", example: 10 },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Executive report data retrieved successfully",
+          },
+          "401": { description: "Unauthorized - Token missing or invalid" },
+          "403": { description: "Forbidden - Super Admin access required" },
+        },
+      },
+    },
   },
 };

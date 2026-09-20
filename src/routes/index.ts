@@ -11,6 +11,7 @@ import { PaymentRoutes } from "../modules/Payment/payment.route";
 import { InvoiceRoutes } from "../modules/Invoice/invoice.route";
 import { ReceiptRoutes } from "../modules/Receipt/receipt.route";
 import { CaseNoteRoutes } from "../modules/CaseNote/case-note.route";
+import { ReportRoutes } from "../modules/Report/report.route";
 
 const router = Router();
 
@@ -62,6 +63,10 @@ const moduleRoutes = [
   {
     path: "/case-notes",
     route: CaseNoteRoutes,
+  },
+  {
+    path: "/reports",
+    route: ReportRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
