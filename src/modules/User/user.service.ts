@@ -83,9 +83,13 @@ const createUser = async (payload: TCreateUserPayload) => {
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
     where: { email: payload.email },
+    select: safeUserSelect,
   });
 
   if (existingUser) {
+    if (existingUser.role?.name === "CLIENT" || payload.roleName === "CLIENT") {
+      return existingUser;
+    }
     throw new AppError(
       httpStatus.CONFLICT,
       "A user with this email already exists",

@@ -131,6 +131,9 @@ const createPayment = async (
 
   return prisma.$transaction(
     async (tx) => {
+      const isVerified = (payload.status === "VERIFIED" && staff);
+      const initialStatus = isVerified ? "VERIFIED" : "PENDING";
+
       const payment = await tx.payment.create({
         data: {
           caseId: payload.caseId,
@@ -142,8 +145,8 @@ const createPayment = async (
           externalReference: payload.externalReference,
           idempotencyKey: payload.idempotencyKey,
           operationalNotes: payload.operationalNotes,
-          status: staff ? "VERIFIED" : "PENDING",
-          verifiedById: staff ? actorId : undefined,
+          status: initialStatus,
+          verifiedById: isVerified ? actorId : undefined,
         },
         include: paymentInclude,
       });
@@ -155,7 +158,7 @@ const createPayment = async (
         });
       }
 
-      if (staff) {
+      if (isVerified) {
         if (payload.installmentId) {
           await tx.installment.update({
             where: { id: payload.installmentId },

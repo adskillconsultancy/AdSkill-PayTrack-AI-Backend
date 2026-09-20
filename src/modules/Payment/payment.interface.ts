@@ -11,6 +11,7 @@ export type TCreatePaymentPayload = {
   idempotencyKey?: string;
   operationalNotes?: string;
   proofDocumentIds?: string[];
+  status?: "PENDING" | "VERIFIED";
 };
 export type TPaymentFilters = {
   status?: string;

@@ -132,6 +132,8 @@ const createClientCase = async (
       destinationCountry: payload.destinationCountry,
       caseCategory: payload.caseCategory,
       caseSubcategory: payload.caseSubcategory,
+      assignedConsultantId: payload.assignedConsultantId ?? undefined,
+      caseStatus: payload.caseStatus ?? undefined,
       agreementDate: payload.agreementDate ? new Date(payload.agreementDate) : undefined,
       serviceStartDate: payload.serviceStartDate ? new Date(payload.serviceStartDate) : undefined,
       clientVisibleNotes: payload.clientVisibleNotes,

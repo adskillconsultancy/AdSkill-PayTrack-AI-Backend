@@ -12,6 +12,7 @@ const createPaymentValidationSchema = z.object({
     idempotencyKey: z.string().trim().min(8).max(200).optional(),
     operationalNotes: z.string().trim().max(2000).optional(),
     proofDocumentIds: z.array(z.string().uuid("Invalid document ID")).optional(),
+    status: z.enum(["PENDING", "VERIFIED"]).optional(),
   }),
 });
 
