@@ -5,6 +5,7 @@ const optionalDate = z.string().datetime({ offset: true }).optional();
 
 const createClientCaseValidationSchema = z.object({
   body: z.object({
+    userId: z.string().uuid("Invalid user ID").optional(),
     serviceId: z.string().uuid("Invalid service ID"),
     destinationCountry: z.string().trim().min(2).max(100).optional(),
     caseCategory: z.string().trim().min(2).max(100).optional(),

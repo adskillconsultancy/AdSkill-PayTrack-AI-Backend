@@ -1,6 +1,7 @@
 import { CaseStatus } from "@prisma/client";
 
 export type TCreateClientCasePayload = {
+  userId?: string;
   serviceId: string;
   destinationCountry?: string;
   caseCategory?: string;

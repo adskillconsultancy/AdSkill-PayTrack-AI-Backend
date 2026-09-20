@@ -64,6 +64,7 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'user:update',
     'service:read',
     'case:read',
+    'case:create',
     'case:manage',
     'document:read',
     'document:upload',

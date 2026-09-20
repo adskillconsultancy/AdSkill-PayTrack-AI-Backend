@@ -101,12 +101,15 @@ const ensureOwnerOrStaff = (record: { userId: string }, actorId: string, staff =
 
 const createClientCase = async (
   payload: TCreateClientCasePayload,
-  userId: string,
+  actorUserId: string,
   userRole?: string,
 ) => {
+  const isStaff = userRole !== "CLIENT";
+  const targetUserId = (isStaff && payload.userId) ? payload.userId : actorUserId;
+
   const [user, service] = await Promise.all([
     prisma.user.findFirst({
-      where: { id: userId, isDeleted: false, status: "ACTIVE" },
+      where: { id: targetUserId, isDeleted: false, status: "ACTIVE" },
       select: { id: true, clientId: true, role: { select: { name: true } } },
     }),
     prisma.service.findFirst({
@@ -121,7 +124,7 @@ const createClientCase = async (
   const created = await prisma.clientCase.create({
     data: {
       caseCode,
-      userId,
+      userId: targetUserId,
       serviceId: service.id,
       serviceCodeSnapshot: service.code,
       serviceNameSnapshot: service.name,
@@ -143,7 +146,7 @@ const createClientCase = async (
   if (payload.clientVisibleNotes?.trim()) {
     initialNotesToCreate.push({
       caseId: created.id,
-      authorId: userId,
+      authorId: actorUserId,
       content: payload.clientVisibleNotes.trim(),
       visibility: "CLIENT",
       isPinned: true,
@@ -152,7 +155,7 @@ const createClientCase = async (
   if (payload.internalNotes?.trim()) {
     initialNotesToCreate.push({
       caseId: created.id,
-      authorId: userId,
+      authorId: actorUserId,
       content: payload.internalNotes.trim(),
       visibility: "STAFF",
       isPinned: true,
@@ -161,7 +164,7 @@ const createClientCase = async (
   if (payload.superAdminNotes?.trim() && userRole === "SUPER_ADMIN") {
     initialNotesToCreate.push({
       caseId: created.id,
-      authorId: userId,
+      authorId: actorUserId,
       content: payload.superAdminNotes.trim(),
       visibility: "SUPER_ADMIN",
       isPinned: true,
@@ -237,7 +240,48 @@ const updateCase = async (
   return sanitizeCaseNotes(updated, userRole);
 };
 
+
+const getAllCases = async (
+  actorUserId: string,
+  userRole?: string,
+  filters?: { search?: string; status?: string; category?: string },
+) => {
+  const isStaff = userRole !== "CLIENT";
+
+  const whereClause: Prisma.ClientCaseWhereInput = {
+    isDeleted: false,
+    ...(!isStaff ? { userId: actorUserId } : {}),
+  };
+
+  if (filters?.status) {
+    whereClause.caseStatus = filters.status as any;
+  }
+  if (filters?.category) {
+    whereClause.caseCategory = filters.category;
+  }
+  if (filters?.search) {
+    const q = filters.search.trim();
+    whereClause.OR = [
+      { caseCode: { contains: q, mode: "insensitive" } },
+      { destinationCountry: { contains: q, mode: "insensitive" } },
+      { caseCategory: { contains: q, mode: "insensitive" } },
+      { user: { name: { contains: q, mode: "insensitive" } } },
+      { user: { email: { contains: q, mode: "insensitive" } } },
+      { user: { clientId: { contains: q, mode: "insensitive" } } },
+    ];
+  }
+
+  const list = await prisma.clientCase.findMany({
+    where: whereClause,
+    select: caseSelect,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return list.map((item) => sanitizeCaseNotes(item, userRole));
+};
+
 export const ClientCaseService = {
+  getAllCases,
   createClientCase,
   getCasesForUser,
   getCaseById,

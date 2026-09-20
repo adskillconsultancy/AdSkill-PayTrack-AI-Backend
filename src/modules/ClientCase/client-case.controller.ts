@@ -53,7 +53,24 @@ const updateCase = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+
+const getAllCases = catchAsync(async (req: Request, res: Response) => {
+  const filters = {
+    search: req.query.search as string | undefined,
+    status: req.query.status as string | undefined,
+    category: req.query.category as string | undefined,
+  };
+  const result = await ClientCaseService.getAllCases(req.user!.id, req.user?.role, filters);
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Client cases retrieved successfully",
+    data: result,
+  });
+});
+
 export const ClientCaseController = {
+  getAllCases,
   createClientCase,
   getMyCases,
   getCaseById,

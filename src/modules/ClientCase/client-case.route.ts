@@ -14,6 +14,8 @@ router.post(
   ClientCaseController.createClientCase,
 );
 
+router.get("/", auth(PERMISSIONS.CASE_READ), ClientCaseController.getAllCases);
+
 router.get("/mine", auth(PERMISSIONS.CASE_READ), ClientCaseController.getMyCases);
 
 router.get(

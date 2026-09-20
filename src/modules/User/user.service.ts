@@ -51,6 +51,34 @@ const safeUserSelect = {
   updatedAt: true,
 };
 
+// Helper to generate a unique Client ID (e.g. ASK-2026-1042)
+const generateClientId = async (): Promise<string> => {
+  const currentYear = new Date().getFullYear();
+  let isUnique = false;
+  let clientId = "";
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!isUnique && attempts < maxAttempts) {
+    attempts++;
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    clientId = `ASK-${currentYear}-${randomSuffix}`;
+    const existing = await prisma.user.findFirst({
+      where: { clientId },
+      select: { id: true },
+    });
+    if (!existing) {
+      isUnique = true;
+    }
+  }
+
+  if (!isUnique) {
+    clientId = `ASK-${currentYear}-${Date.now().toString().slice(-4)}`;
+  }
+
+  return clientId;
+};
+
 const createUser = async (payload: TCreateUserPayload) => {
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
@@ -149,9 +177,15 @@ const createUser = async (payload: TCreateUserPayload) => {
     );
   }
 
+  let assignedClientId = userData.clientId;
+  if (!assignedClientId) {
+    assignedClientId = await generateClientId();
+  }
+
   const result = await prisma.user.create({
     data: {
       ...userData,
+      clientId: assignedClientId,
       roleId: targetRoleId,
       password: hashedPassword,
       ...(userPermsToCreate.length > 0
