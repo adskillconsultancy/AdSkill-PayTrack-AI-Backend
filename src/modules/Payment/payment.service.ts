@@ -14,6 +14,7 @@ const paymentInclude = {
       userId: true,
       caseCategory: true,
       destinationCountry: true,
+      assignedConsultantId: true,
       user: {
         select: {
           id: true,
@@ -60,14 +61,17 @@ const paymentInclude = {
   },
 };
 
-const ensureCase = async (caseId: string, actorId: string, staff: boolean) => {
+const ensureCase = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => {
   const record = await prisma.clientCase.findFirst({
     where: { id: caseId, isDeleted: false },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, assignedConsultantId: true },
   });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   if (!staff && record.userId !== actorId) {
     throw new AppError(httpStatus.FORBIDDEN, "You cannot access this client case");
+  }
+  if (userRole === "CONSULTANT" && record.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
   return record;
 };
@@ -92,12 +96,36 @@ const refreshFinancialStatus = async (tx: Prisma.TransactionClient, caseId: stri
   await tx.clientCase.update({ where: { id: caseId }, data: { financialStatus: status } });
 };
 
+const refreshInstallmentStatus = async (tx: Prisma.TransactionClient, installmentId: string) => {
+  const inst = await tx.installment.findUnique({
+    where: { id: installmentId },
+    select: { id: true, amount: true },
+  });
+  if (!inst) return;
+
+  const paidAgg = await tx.payment.aggregate({
+    where: { installmentId, isDeleted: false, status: "VERIFIED" },
+    _sum: { amount: true },
+  });
+  const totalPaid = paidAgg._sum.amount ?? new Prisma.Decimal(0);
+  const status = totalPaid.gte(inst.amount)
+    ? "PAID"
+    : totalPaid.gt(0)
+      ? "PARTIALLY_PAID"
+      : "PENDING";
+  await tx.installment.update({
+    where: { id: installmentId },
+    data: { status },
+  });
+};
+
 const createPayment = async (
   payload: TCreatePaymentPayload,
   actorId: string,
   staff: boolean,
+  userRole?: string,
 ) => {
-  await ensureCase(payload.caseId, actorId, staff);
+  await ensureCase(payload.caseId, actorId, staff, userRole);
   const amount = new Prisma.Decimal(payload.amount);
 
   // Pre-validate outside interactive transaction to avoid holding DB connections / timing out
@@ -124,14 +152,20 @@ const createPayment = async (
       select: { id: true, amount: true },
     });
     if (!installment) throw new AppError(httpStatus.BAD_REQUEST, "Installment does not belong to case");
-    if (amount.gt(installment.amount)) {
-      throw new AppError(httpStatus.BAD_REQUEST, "Payment cannot exceed installment amount");
+    const alreadyPaid = await prisma.payment.aggregate({
+      where: { installmentId: payload.installmentId, isDeleted: false, status: "VERIFIED" },
+      _sum: { amount: true },
+    });
+    const remaining = installment.amount.sub(alreadyPaid._sum.amount ?? new Prisma.Decimal(0));
+    if (amount.gt(remaining)) {
+      throw new AppError(httpStatus.BAD_REQUEST, `Payment cannot exceed remaining installment balance (${remaining})`);
     }
   }
 
   return prisma.$transaction(
     async (tx) => {
-      const isVerified = (payload.status === "VERIFIED" && staff);
+      const isVerifiableStaff = userRole === "SUPER_ADMIN" || userRole === "MANAGER";
+      const isVerified = isVerifiableStaff && payload.status !== "PENDING";
       const initialStatus = isVerified ? "VERIFIED" : "PENDING";
 
       const payment = await tx.payment.create({
@@ -160,10 +194,7 @@ const createPayment = async (
 
       if (isVerified) {
         if (payload.installmentId) {
-          await tx.installment.update({
-            where: { id: payload.installmentId },
-            data: { status: "PAID" },
-          });
+          await refreshInstallmentStatus(tx, payload.installmentId);
         }
         await refreshFinancialStatus(tx, payload.caseId);
       }
@@ -177,8 +208,8 @@ const createPayment = async (
   );
 };
 
-const listPayments = async (caseId: string, actorId: string, staff: boolean) => {
-  await ensureCase(caseId, actorId, staff);
+const listPayments = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => {
+  await ensureCase(caseId, actorId, staff, userRole);
   return prisma.payment.findMany({
     where: { caseId, isDeleted: false },
     include: paymentInclude,
@@ -200,7 +231,7 @@ const verifyPayment = async (id: string, actorId: string) => {
         include: paymentInclude,
       });
       if (payment.installmentId) {
-        await tx.installment.update({ where: { id: payment.installmentId }, data: { status: "PAID" } });
+        await refreshInstallmentStatus(tx, payment.installmentId);
       }
       await refreshFinancialStatus(tx, payment.caseId);
       return updated;
@@ -212,10 +243,13 @@ const verifyPayment = async (id: string, actorId: string) => {
   );
 };
 
-const getPaymentById = async (id: string, actorId: string, staff: boolean) => {
+const getPaymentById = async (id: string, actorId: string, staff: boolean, userRole?: string) => {
   const payment = await prisma.payment.findFirst({ where: { id, isDeleted: false }, include: paymentInclude });
   if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
   if (!staff && payment.case.userId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You cannot access this payment");
+  if (userRole === "CONSULTANT" && payment.case.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
 
   const proofDocumentsWithUrls = await Promise.all(
     (payment.proofDocuments || []).map(async (doc) => {
@@ -235,6 +269,7 @@ const getAllPayments = async (
   filters: TPaymentFilters,
   actorId: string,
   staff: boolean,
+  userRole?: string,
 ) => {
   const whereCondition: Prisma.PaymentWhereInput = {
     isDeleted: false,
@@ -244,6 +279,10 @@ const getAllPayments = async (
   if (!staff) {
     whereCondition.case = {
       userId: actorId,
+    };
+  } else if (userRole === "CONSULTANT") {
+    whereCondition.case = {
+      assignedConsultantId: actorId,
     };
   }
 

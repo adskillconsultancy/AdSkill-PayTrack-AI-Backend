@@ -53,3 +53,20 @@ export type TAuthResponse = {
 export type TRefreshTokenResponse = {
   accessToken: string;
 };
+
+export type TUpdateProfilePayload = {
+  name?: string;
+  preferredName?: string | null;
+  phone?: string | null;
+  whatsapp?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+};
+
+export type TChangePasswordPayload = {
+  currentPassword: string;
+  newPassword: string;
+};

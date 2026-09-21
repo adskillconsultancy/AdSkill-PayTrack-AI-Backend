@@ -22,6 +22,7 @@ const uploadCaseDocuments = catchAsync(async (req: Request, res: Response) => {
     req.user!.id,
     req.body.documentType,
     req.body.paymentId,
+    req.user?.role,
   );
 
   sendResponse(res, {
@@ -33,7 +34,11 @@ const uploadCaseDocuments = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getCaseDocuments = catchAsync(async (req: Request, res: Response) => {
-  const result = await UploadService.getCaseDocuments(req.params.caseId, req.user!.id);
+  const result = await UploadService.getCaseDocuments(
+    req.params.caseId,
+    req.user!.id,
+    req.user?.role,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -43,12 +48,20 @@ const getCaseDocuments = catchAsync(async (req: Request, res: Response) => {
 });
 
 const deleteDocument = catchAsync(async (req: Request, res: Response) => {
-  const result = await UploadService.deleteDocument(req.params.documentId, req.user!.id);
+  const result = await UploadService.deleteDocument(
+    req.params.documentId,
+    req.user!.id,
+    req.user?.role,
+  );
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Document deleted successfully", data: result });
 });
 
 const getDocumentDownload = catchAsync(async (req: Request, res: Response) => {
-  const result = await UploadService.getDocumentDownload(req.params.documentId, req.user!.id);
+  const result = await UploadService.getDocumentDownload(
+    req.params.documentId,
+    req.user!.id,
+    req.user?.role,
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,

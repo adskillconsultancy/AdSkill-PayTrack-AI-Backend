@@ -11,6 +11,7 @@ const createPaymentPlan = catchAsync(async (req: Request, res: Response) => {
     req.params.caseId,
     req.body,
     req.user!.id,
+    req.user?.role,
   );
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -25,6 +26,7 @@ const getCasePaymentPlans = catchAsync(async (req: Request, res: Response) => {
     req.params.caseId,
     req.user!.id,
     isStaff(req),
+    req.user?.role,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -39,6 +41,7 @@ const getPaymentPlanById = catchAsync(async (req: Request, res: Response) => {
     req.params.id,
     req.user!.id,
     isStaff(req),
+    req.user?.role,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

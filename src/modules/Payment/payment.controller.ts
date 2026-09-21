@@ -7,17 +7,17 @@ import { PaymentService } from "./payment.service";
 const isStaff = (req: Request) => req.user?.role !== "CLIENT";
 
 const createPayment = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.createPayment(req.body, req.user!.id, isStaff(req));
+  const result = await PaymentService.createPayment(req.body, req.user!.id, isStaff(req), req.user?.role);
   sendResponse(res, { statusCode: httpStatus.CREATED, success: true, message: "Payment recorded successfully", data: result });
 });
 
 const listPayments = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.listPayments(req.params.caseId, req.user!.id, isStaff(req));
+  const result = await PaymentService.listPayments(req.params.caseId, req.user!.id, isStaff(req), req.user?.role);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payments retrieved successfully", data: result });
 });
 
 const getPaymentById = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.getPaymentById(req.params.id, req.user!.id, isStaff(req));
+  const result = await PaymentService.getPaymentById(req.params.id, req.user!.id, isStaff(req), req.user?.role);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payment retrieved successfully", data: result });
 });
 
@@ -31,6 +31,7 @@ const getAllPayments = catchAsync(async (req: Request, res: Response) => {
     req.query as any,
     req.user!.id,
     isStaff(req),
+    req.user?.role,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

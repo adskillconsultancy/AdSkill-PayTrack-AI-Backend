@@ -54,8 +54,35 @@ const refreshTokenValidationSchema = z.object({
     .optional(),
 });
 
+const updateProfileValidationSchema = z.object({
+  body: z.object({
+    name: z.string().min(1, "Name cannot be empty").optional(),
+    preferredName: z.string().nullable().optional(),
+    phone: z.string().nullable().optional(),
+    whatsapp: z.string().nullable().optional(),
+    address: z.string().nullable().optional(),
+    city: z.string().nullable().optional(),
+    state: z.string().nullable().optional(),
+    postalCode: z.string().nullable().optional(),
+    country: z.string().nullable().optional(),
+  }),
+});
+
+const changePasswordValidationSchema = z.object({
+  body: z.object({
+    currentPassword: z.string({
+      required_error: "Current password is required",
+    }).min(1, "Current password is required"),
+    newPassword: z.string({
+      required_error: "New password is required",
+    }).min(6, "New password must be at least 6 characters"),
+  }),
+});
+
 export const AuthValidation = {
   registerValidationSchema,
   loginValidationSchema,
   refreshTokenValidationSchema,
+  updateProfileValidationSchema,
+  changePasswordValidationSchema,
 };

@@ -30,4 +30,20 @@ router.post(
 // Get Current Authenticated User Profile & Permissions
 router.get("/me", auth(), AuthController.getMe);
 
+// Update Authenticated User's Personal Profile Info
+router.patch(
+  "/profile",
+  auth(),
+  validateRequest(AuthValidation.updateProfileValidationSchema),
+  AuthController.updateProfile,
+);
+
+// Change Password for Authenticated User
+router.post(
+  "/change-password",
+  auth(),
+  validateRequest(AuthValidation.changePasswordValidationSchema),
+  AuthController.changePassword,
+);
+
 export const AuthRoutes = router;

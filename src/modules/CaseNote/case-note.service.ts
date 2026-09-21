@@ -25,11 +25,15 @@ const createNote = async (
   // 1. Verify case exists
   const existingCase = await prisma.clientCase.findUnique({
     where: { id: payload.caseId, isDeleted: false },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, assignedConsultantId: true },
   });
 
   if (!existingCase) {
     throw new AppError(httpStatus.NOT_FOUND, "Target client case not found");
+  }
+
+  if (authorRole === "CONSULTANT" && existingCase.assignedConsultantId !== authorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
 
   // 2. Check role constraints on visibility
@@ -76,11 +80,15 @@ const getCaseNotes = async (
   // 1. Verify case exists
   const existingCase = await prisma.clientCase.findUnique({
     where: { id: caseId, isDeleted: false },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, assignedConsultantId: true },
   });
 
   if (!existingCase) {
     throw new AppError(httpStatus.NOT_FOUND, "Target client case not found");
+  }
+
+  if (actorRole === "CONSULTANT" && existingCase.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
 
   // 2. Determine visibility filter based on actor's role

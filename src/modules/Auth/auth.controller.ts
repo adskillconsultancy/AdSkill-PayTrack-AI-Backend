@@ -71,9 +71,35 @@ const getMe = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateProfile = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const result = await AuthService.updateProfile(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Profile updated successfully",
+    data: result,
+  });
+});
+
+const changePassword = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const result = await AuthService.changePassword(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
 export const AuthController = {
   register,
   login,
   refreshToken,
   getMe,
+  updateProfile,
+  changePassword,
 };

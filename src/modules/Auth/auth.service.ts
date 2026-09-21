@@ -7,9 +7,11 @@ import prisma from "../../lib/prisma";
 import {
   TAuthResponse,
   TAuthUserResponse,
+  TChangePasswordPayload,
   TLoginPayload,
   TRefreshTokenResponse,
   TRegisterPayload,
+  TUpdateProfilePayload,
 } from "./auth.interface";
 import { PERMISSIONS } from "../User/user.constant";
 
@@ -372,9 +374,88 @@ const getMe = async (userId: string): Promise<TAuthUserResponse> => {
   return formatAuthUser(user);
 };
 
+const updateProfile = async (
+  userId: string,
+  payload: TUpdateProfilePayload,
+): Promise<TAuthUserResponse> => {
+  const existing = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, isDeleted: true, status: true },
+  });
+
+  if (!existing || existing.isDeleted) {
+    throw new AppError(httpStatus.NOT_FOUND, "User profile not found");
+  }
+
+  if (existing.status !== "ACTIVE") {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      `Your account is ${existing.status.toLowerCase()}. Please contact support.`,
+    );
+  }
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: {
+      ...(payload.name !== undefined && { name: payload.name.trim() }),
+      ...(payload.preferredName !== undefined && { preferredName: payload.preferredName?.trim() || null }),
+      ...(payload.phone !== undefined && { phone: payload.phone?.trim() || null }),
+      ...(payload.whatsapp !== undefined && { whatsapp: payload.whatsapp?.trim() || null }),
+      ...(payload.address !== undefined && { address: payload.address?.trim() || null }),
+      ...(payload.city !== undefined && { city: payload.city?.trim() || null }),
+      ...(payload.state !== undefined && { state: payload.state?.trim() || null }),
+      ...(payload.postalCode !== undefined && { postalCode: payload.postalCode?.trim() || null }),
+      ...(payload.country !== undefined && { country: payload.country?.trim() || null }),
+    },
+    select: authUserSelect,
+  });
+
+  return formatAuthUser(updated);
+};
+
+const changePassword = async (
+  userId: string,
+  payload: TChangePasswordPayload,
+) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, password: true, isDeleted: true, status: true },
+  });
+
+  if (!user || user.isDeleted) {
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+  }
+
+  if (user.status !== "ACTIVE") {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      `Your account is ${user.status.toLowerCase()}. Please contact support.`,
+    );
+  }
+
+  const isMatch = await bcryptjs.compare(payload.currentPassword, user.password);
+  if (!isMatch) {
+    throw new AppError(httpStatus.UNAUTHORIZED, "Current password does not match");
+  }
+
+  const hashedPassword = await bcryptjs.hash(
+    payload.newPassword,
+    config.bcrypt_salt_rounds,
+  );
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword },
+  });
+
+  return { message: "Password updated successfully" };
+};
+
 export const AuthService = {
   register,
   login,
   refreshToken,
   getMe,
+  updateProfile,
+  changePassword,
 };

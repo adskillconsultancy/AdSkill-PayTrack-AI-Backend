@@ -61,7 +61,16 @@ const caseSelect = {
       role: { select: { id: true, name: true } },
     },
   },
-  assignedConsultant: { select: { id: true, name: true, email: true } },
+  assignedConsultant: {
+    select: {
+      id: true,
+      name: true,
+      preferredName: true,
+      email: true,
+      phone: true,
+      whatsapp: true,
+    },
+  },
 } satisfies Prisma.ClientCaseSelect;
 
 type CaseWithRelations = Prisma.ClientCaseGetPayload<{ select: typeof caseSelect }>;
@@ -120,6 +129,11 @@ const createClientCase = async (
   if (!user) throw new AppError(httpStatus.UNAUTHORIZED, "Active client account required");
   if (!service) throw new AppError(httpStatus.NOT_FOUND, "Active service not found");
 
+  const assignedConsultantId =
+    userRole === "CONSULTANT"
+      ? actorUserId
+      : (payload.assignedConsultantId ?? undefined);
+
   const caseCode = await createCaseCode(user.clientId);
   const created = await prisma.clientCase.create({
     data: {
@@ -132,7 +146,7 @@ const createClientCase = async (
       destinationCountry: payload.destinationCountry,
       caseCategory: payload.caseCategory,
       caseSubcategory: payload.caseSubcategory,
-      assignedConsultantId: payload.assignedConsultantId ?? undefined,
+      assignedConsultantId,
       caseStatus: payload.caseStatus ?? undefined,
       agreementDate: payload.agreementDate ? new Date(payload.agreementDate) : undefined,
       serviceStartDate: payload.serviceStartDate ? new Date(payload.serviceStartDate) : undefined,
@@ -182,8 +196,12 @@ const createClientCase = async (
 };
 
 const getCasesForUser = async (userId: string, userRole?: string) => {
+  const where: Prisma.ClientCaseWhereInput = {
+    isDeleted: false,
+    ...(userRole === "CONSULTANT" ? { assignedConsultantId: userId } : { userId }),
+  };
   const list = await prisma.clientCase.findMany({
-    where: { userId, isDeleted: false },
+    where,
     select: caseSelect,
     orderBy: { createdAt: "desc" },
   });
@@ -197,6 +215,9 @@ const getCaseById = async (id: string, userId: string, staff = false, userRole?:
   });
   if (!result) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   ensureOwnerOrStaff(result, userId, staff);
+  if (userRole === "CONSULTANT" && result.assignedConsultantId !== userId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
   return sanitizeCaseNotes(result, userRole);
 };
 
@@ -209,10 +230,18 @@ const updateCase = async (
 ) => {
   const existing = await prisma.clientCase.findFirst({
     where: { id, isDeleted: false },
-    select: { userId: true },
+    select: { userId: true, assignedConsultantId: true },
   });
   if (!existing) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   ensureOwnerOrStaff(existing, userId, staff);
+
+  if (userRole === "CONSULTANT" && existing.assignedConsultantId !== userId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
+
+  if (userRole === "CONSULTANT" && payload.assignedConsultantId !== undefined && payload.assignedConsultantId !== existing.assignedConsultantId) {
+    throw new AppError(httpStatus.FORBIDDEN, "Consultants cannot reassign cases");
+  }
 
   if (!staff && (payload.caseStatus !== undefined || payload.internalNotes !== undefined || payload.assignedConsultantId !== undefined)) {
     throw new AppError(httpStatus.FORBIDDEN, "Only staff can update internal case fields");
@@ -248,11 +277,10 @@ const getAllCases = async (
   userRole?: string,
   filters?: { search?: string; status?: string; category?: string },
 ) => {
-  const isStaff = userRole !== "CLIENT";
-
   const whereClause: Prisma.ClientCaseWhereInput = {
     isDeleted: false,
-    ...(!isStaff ? { userId: actorUserId } : {}),
+    ...(userRole === "CLIENT" ? { userId: actorUserId } : {}),
+    ...(userRole === "CONSULTANT" ? { assignedConsultantId: actorUserId } : {}),
   };
 
   if (filters?.status) {

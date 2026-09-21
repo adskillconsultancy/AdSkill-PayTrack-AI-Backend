@@ -6,23 +6,26 @@ import { TCreatePaymentPlanPayload } from "./payment-plan.interface";
 
 const planInclude = {
   installments: { where: { isDeleted: false }, orderBy: { sequenceNumber: "asc" as const } },
-  case: { select: { id: true, caseCode: true, userId: true, serviceNameSnapshot: true } },
+  case: { select: { id: true, caseCode: true, userId: true, serviceNameSnapshot: true, assignedConsultantId: true } },
 };
 
-const ensureCaseAccess = async (caseId: string, actorId: string, staff: boolean) => {
+const ensureCaseAccess = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => {
   const record = await prisma.clientCase.findFirst({
     where: { id: caseId, isDeleted: false },
-    select: { id: true, userId: true },
+    select: { id: true, userId: true, assignedConsultantId: true },
   });
   if (!record) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   if (!staff && record.userId !== actorId) {
     throw new AppError(httpStatus.FORBIDDEN, "You cannot access this client case");
   }
+  if (userRole === "CONSULTANT" && record.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
   return record;
 };
 
-const getPaymentPlansForCase = async (caseId: string, actorId: string, staff: boolean) => {
-  await ensureCaseAccess(caseId, actorId, staff);
+const getPaymentPlansForCase = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => {
+  await ensureCaseAccess(caseId, actorId, staff, userRole);
   return prisma.paymentPlan.findMany({
     where: { caseId, isDeleted: false },
     include: planInclude,
@@ -34,8 +37,9 @@ const createPaymentPlan = async (
   caseId: string,
   payload: TCreatePaymentPlanPayload,
   actorId: string,
+  userRole?: string,
 ) => {
-  await ensureCaseAccess(caseId, actorId, true);
+  await ensureCaseAccess(caseId, actorId, true, userRole);
   const serviceCase = await prisma.clientCase.findUnique({
     where: { id: caseId },
     select: { service: { select: { baseFee: true, currency: true } } },
@@ -93,7 +97,7 @@ const createPaymentPlan = async (
   });
 };
 
-const getPaymentPlanById = async (id: string, actorId: string, staff: boolean) => {
+const getPaymentPlanById = async (id: string, actorId: string, staff: boolean, userRole?: string) => {
   const plan = await prisma.paymentPlan.findFirst({
     where: { id, isDeleted: false },
     include: planInclude,
@@ -101,6 +105,9 @@ const getPaymentPlanById = async (id: string, actorId: string, staff: boolean) =
   if (!plan) throw new AppError(httpStatus.NOT_FOUND, "Payment plan not found");
   if (!staff && plan.case.userId !== actorId) {
     throw new AppError(httpStatus.FORBIDDEN, "You cannot access this payment plan");
+  }
+  if (userRole === "CONSULTANT" && plan.case.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
   return plan;
 };

@@ -87,6 +87,7 @@ const uploadCaseDocuments = async (
   actorId: string,
   documentType: "AGREEMENT" | "INVOICE" | "RECEIPT" | "PAYMENT_PROOF" | "IDENTITY" | "SUPPORTING" | "OTHER" = "SUPPORTING",
   paymentId?: string,
+  userRole?: string,
 ): Promise<TUploadedDocument[]> => {
   if (!files.length) throw new AppError(httpStatus.BAD_REQUEST, "At least one document file is required");
   const staff = await isStaffActor(actorId);
@@ -94,9 +95,12 @@ const uploadCaseDocuments = async (
     where: staff
       ? { id: caseId, isDeleted: false }
       : { id: caseId, userId: actorId, isDeleted: false },
-    select: { userId: true, caseCode: true, user: { select: { clientId: true } } },
+    select: { userId: true, caseCode: true, assignedConsultantId: true, user: { select: { clientId: true } } },
   });
   if (!clientCase) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
+  if (userRole === "CONSULTANT" && clientCase.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
 
   const uploadedKeys: string[] = [];
   try {
@@ -150,7 +154,14 @@ const uploadCaseDocuments = async (
   }
 };
 
-const getCaseDocuments = async (caseId: string, actorId: string) => {
+const getCaseDocuments = async (caseId: string, actorId: string, userRole?: string) => {
+  if (userRole === "CONSULTANT") {
+    const assigned = await prisma.clientCase.findFirst({
+      where: { id: caseId, assignedConsultantId: actorId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!assigned) throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
   const staff = await isStaffActor(actorId);
   const documents = await prisma.document.findMany({
     where: {
@@ -185,17 +196,21 @@ const getCaseDocuments = async (caseId: string, actorId: string) => {
   })));
 };
 
-const deleteDocument = async (documentId: string, actorId: string) => {
+const deleteDocument = async (documentId: string, actorId: string, userRole?: string) => {
   const staff = await isStaffActor(actorId);
   const document = await prisma.document.findFirst({
     where: { id: documentId, isDeleted: false, ...(staff ? {} : { userId: actorId }) },
+    include: { case: { select: { assignedConsultantId: true } } },
   });
   if (!document) throw new AppError(httpStatus.NOT_FOUND, "Document not found");
+  if (userRole === "CONSULTANT" && document.case?.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
   await prisma.document.update({ where: { id: documentId }, data: { isDeleted: true, deletedAt: new Date() } });
   await deletePrivateObject(document.objectKey);
   return { id: document.id, deleted: true };
 };
-const getDocumentDownload = async (documentId: string, actorId: string) => {
+const getDocumentDownload = async (documentId: string, actorId: string, userRole?: string) => {
   const staff = await isStaffActor(actorId);
   const document = await prisma.document.findFirst({
     where: {
@@ -203,9 +218,13 @@ const getDocumentDownload = async (documentId: string, actorId: string) => {
       isDeleted: false,
       ...(staff ? {} : { userId: actorId }),
     },
+    include: { case: { select: { assignedConsultantId: true } } },
   });
 
   if (!document) throw new AppError(httpStatus.NOT_FOUND, "Document not found");
+  if (userRole === "CONSULTANT" && document.case?.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
   if (document.scanStatus === "REJECTED") {
     throw new AppError(httpStatus.FORBIDDEN, "Rejected documents cannot be downloaded");
   }

@@ -210,6 +210,8 @@ const getAllUsers = async (
   filters: TUserFilterRequest,
   paginationOptions?: IPaginationOptions,
   sortOptions?: ISortOptions,
+  actorUserId?: string,
+  userRole?: string,
 ) => {
   const { page, limit, skip } = calculatePagination(paginationOptions);
   const orderBy = buildSortOrder(
@@ -227,6 +229,28 @@ const getAllUsers = async (
   andConditions.push({
     isDeleted: isDeleted !== undefined ? isDeleted : false,
   });
+
+  // Client role can only view their own user account
+  if (userRole === "CLIENT" && actorUserId) {
+    andConditions.push({ id: actorUserId });
+  }
+
+  // Consultant role: only see staff members or clients assigned to them
+  if (userRole === "CONSULTANT" && actorUserId) {
+    andConditions.push({
+      OR: [
+        { role: { name: { in: ["SUPER_ADMIN", "MANAGER", "CONSULTANT"] } } },
+        {
+          clientCases: {
+            some: {
+              assignedConsultantId: actorUserId,
+              isDeleted: false,
+            },
+          },
+        },
+      ],
+    });
+  }
 
   // Reusable multi-field search
   const searchCondition = buildSearchFilter(searchTerm, userSearchableFields);
@@ -289,20 +313,47 @@ const getAllUsers = async (
   };
 };
 
-const getUserById = async (idOrClientId: string) => {
+const getUserById = async (
+  idOrClientId: string,
+  actorUserId?: string,
+  userRole?: string,
+) => {
   const user = await prisma.user.findFirst({
     where: {
       OR: [{ id: idOrClientId }, { clientId: idOrClientId }],
       isDeleted: false,
     },
-    select: safeUserSelect,
+    select: {
+      ...safeUserSelect,
+      clientCases: {
+        where: { isDeleted: false },
+        select: { assignedConsultantId: true },
+      },
+    },
   });
 
   if (!user) {
     throw new AppError(httpStatus.NOT_FOUND, "User not found");
   }
 
-  return user;
+  if (userRole === "CLIENT" && actorUserId && user.id !== actorUserId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You cannot access this user profile");
+  }
+
+  if (userRole === "CONSULTANT" && actorUserId && user.role?.name === "CLIENT") {
+    const isAssigned = user.clientCases?.some(
+      (c) => c.assignedConsultantId === actorUserId,
+    );
+    if (!isAssigned) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "You are not assigned to this client",
+      );
+    }
+  }
+
+  const { clientCases, ...safeUser } = user;
+  return safeUser;
 };
 
 const updateUser = async (

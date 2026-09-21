@@ -14,7 +14,7 @@ router.get(
 );
 router.post(
   "/",
-  auth(PERMISSIONS.PAYMENT_PAY, PERMISSIONS.PAYMENT_RECORD),
+  auth(PERMISSIONS.PAYMENT_PAY, PERMISSIONS.PAYMENT_RECORD, PERMISSIONS.PAYMENT_READ),
   validateRequest(PaymentValidation.createPaymentValidationSchema),
   PaymentController.createPayment,
 );
