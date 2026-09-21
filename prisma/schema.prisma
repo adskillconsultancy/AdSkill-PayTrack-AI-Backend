@@ -162,6 +162,12 @@ model User {
   auditLogs            AuditLog[]
   caseNotes            CaseNote[]       @relation("CaseNoteAuthor")
 
+  // Support Ticket Relations
+  clientSupportTickets    SupportTicket[]  @relation("ClientSupportTickets")
+  consultantSupportTickets SupportTicket[] @relation("ConsultantSupportTickets")
+  handledSupportTickets   SupportTicket[]  @relation("StaffHandledTickets")
+  supportMessages         SupportMessage[] @relation("MessageSender")
+
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -255,6 +261,7 @@ model ClientCase {
   invoices              Invoice[]
   receipts              Receipt[]
   caseNotes             CaseNote[]
+  supportTickets        SupportTicket[]
 
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
@@ -450,4 +457,86 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@map("audit_logs")
 }
+
+// ==================== SUPPORT & MESSAGING ====================
+
+enum SupportTargetType {
+  CONSULTANT
+  MANAGEMENT_ADMIN
+}
+
+enum SupportCategory {
+  CASE_STATUS
+  DOCUMENT_VERIFICATION
+  BILLING_PAYMENT
+  MILESTONE_SCHEDULE
+  SERVICE_INQUIRY
+  GENERAL
+}
+
+enum SupportPriority {
+  LOW
+  NORMAL
+  URGENT
+}
+
+enum SupportStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CLIENT
+  RESOLVED
+  CLOSED
+}
+
+model SupportTicket {
+  id                    String            @id @default(uuid())
+  ticketCode            String            @unique // e.g. TKT-2026-1042
+  clientId              String
+  caseId                String?
+  targetType            SupportTargetType @default(MANAGEMENT_ADMIN)
+  assignedConsultantId  String?           // Auto-populated if target is CONSULTANT
+  assignedStaffId       String?           // Staff/Admin actively handling or replying
+  category              SupportCategory   @default(GENERAL)
+  priority              SupportPriority   @default(NORMAL)
+  status                SupportStatus     @default(OPEN)
+  subject               String
+  lastMessageAt         DateTime          @default(now())
+  isDeleted             Boolean           @default(false)
+  deletedAt             DateTime?
+
+  client                User              @relation("ClientSupportTickets", fields: [clientId], references: [id], onDelete: Restrict)
+  case                  ClientCase?       @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  assignedConsultant    User?             @relation("ConsultantSupportTickets", fields: [assignedConsultantId], references: [id], onDelete: SetNull)
+  assignedStaff         User?             @relation("StaffHandledTickets", fields: [assignedStaffId], references: [id], onDelete: SetNull)
+  messages              SupportMessage[]
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  @@index([clientId, isDeleted])
+  @@index([targetType, status, isDeleted])
+  @@index([assignedConsultantId, isDeleted])
+  @@index([assignedStaffId, isDeleted])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id           String        @id @default(uuid())
+  ticketId     String
+  senderId     String
+  message      String        @db.Text
+  isStaffReply Boolean       @default(false)
+  attachments  Json?         // Array of attachment URLs / metadata
+  readAt       DateTime?
+
+  ticket       SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  sender       User          @relation("MessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
 
