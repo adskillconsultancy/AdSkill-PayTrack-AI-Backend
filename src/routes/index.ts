@@ -14,6 +14,7 @@ import { CaseNoteRoutes } from "../modules/CaseNote/case-note.route";
 import { ReportRoutes } from "../modules/Report/report.route";
 import { SupportRoutes } from "../modules/Support/support.route";
 import { AuditRoutes } from "../modules/Audit/audit.route";
+import { DashboardRoutes } from "../modules/Dashboard/dashboard.route";
 
 const router = Router();
 
@@ -77,6 +78,10 @@ const moduleRoutes = [
   {
     path: "/audit-logs",
     route: AuditRoutes,
+  },
+  {
+    path: "/dashboard",
+    route: DashboardRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },
