@@ -14,6 +14,7 @@ import {
   TUpdateProfilePayload,
 } from "./auth.interface";
 import { PERMISSIONS } from "../User/user.constant";
+import { AuditService } from "../Audit/audit.service";
 
 // Safe user select definition for auth responses
 const authUserSelect = {
@@ -237,6 +238,20 @@ const register = async (payload: TRegisterPayload): Promise<TAuthResponse> => {
     role: user.role.name,
   });
 
+  AuditService.writeAuditLog({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "REGISTER",
+    targetEntity: "User",
+    targetId: user.id,
+    afterValue: {
+      email: user.email,
+      name: user.name,
+      role: user.role?.name,
+      clientId: user.clientId,
+    },
+  });
+
   return {
     accessToken,
     refreshToken,
@@ -258,11 +273,26 @@ const login = async (payload: TLoginPayload): Promise<TAuthResponse> => {
   });
 
   if (!user || user.isDeleted || user.role?.isDeleted) {
+    AuditService.writeAuditLog({
+      actorEmail: normalizedEmail,
+      action: "LOGIN_FAILED",
+      targetEntity: "User",
+      targetId: "unknown",
+      reason: "Account not found or inactive",
+    });
     throw new AppError(httpStatus.UNAUTHORIZED, "Invalid email or password");
   }
 
   // 2. Account status check
   if (user.status !== "ACTIVE") {
+    AuditService.writeAuditLog({
+      actorId: user.id,
+      actorEmail: user.email,
+      action: "LOGIN_BLOCKED",
+      targetEntity: "User",
+      targetId: user.id,
+      reason: `Account status is ${user.status}`,
+    });
     throw new AppError(
       httpStatus.FORBIDDEN,
       `Your account is currently ${user.status.toLowerCase()}. Please contact AdSkill support.`,
@@ -276,6 +306,14 @@ const login = async (payload: TLoginPayload): Promise<TAuthResponse> => {
   );
 
   if (!isPasswordMatched) {
+    AuditService.writeAuditLog({
+      actorId: user.id,
+      actorEmail: user.email,
+      action: "LOGIN_FAILED",
+      targetEntity: "User",
+      targetId: user.id,
+      reason: "Incorrect password",
+    });
     throw new AppError(httpStatus.UNAUTHORIZED, "Invalid email or password");
   }
 
@@ -284,6 +322,18 @@ const login = async (payload: TLoginPayload): Promise<TAuthResponse> => {
     id: user.id,
     email: user.email,
     role: user.role.name,
+  });
+
+  AuditService.writeAuditLog({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: "LOGIN_SUCCESS",
+    targetEntity: "User",
+    targetId: user.id,
+    afterValue: {
+      email: user.email,
+      role: user.role?.name,
+    },
   });
 
   return {
@@ -410,6 +460,21 @@ const updateProfile = async (
     select: authUserSelect,
   });
 
+  AuditService.writeAuditLog({
+    actorId: userId,
+    actorEmail: updated.email,
+    action: "UPDATE_PROFILE",
+    targetEntity: "User",
+    targetId: userId,
+    afterValue: {
+      name: updated.name,
+      email: updated.email,
+      phone: updated.phone,
+      whatsapp: updated.whatsapp,
+      country: updated.country,
+    },
+  });
+
   return formatAuthUser(updated);
 };
 
@@ -419,7 +484,7 @@ const changePassword = async (
 ) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, password: true, isDeleted: true, status: true },
+    select: { id: true, email: true, password: true, isDeleted: true, status: true },
   });
 
   if (!user || user.isDeleted) {
@@ -435,6 +500,14 @@ const changePassword = async (
 
   const isMatch = await bcryptjs.compare(payload.currentPassword, user.password);
   if (!isMatch) {
+    AuditService.writeAuditLog({
+      actorId: userId,
+      actorEmail: user.email,
+      action: "PASSWORD_CHANGE_FAILED",
+      targetEntity: "User",
+      targetId: userId,
+      reason: "Current password mismatch",
+    });
     throw new AppError(httpStatus.UNAUTHORIZED, "Current password does not match");
   }
 
@@ -446,6 +519,14 @@ const changePassword = async (
   await prisma.user.update({
     where: { id: userId },
     data: { password: hashedPassword },
+  });
+
+  AuditService.writeAuditLog({
+    actorId: userId,
+    actorEmail: user.email,
+    action: "PASSWORD_CHANGE",
+    targetEntity: "User",
+    targetId: userId,
   });
 
   return { message: "Password updated successfully" };

@@ -7,7 +7,13 @@ import { PaymentService } from "./payment.service";
 const isStaff = (req: Request) => req.user?.role !== "CLIENT";
 
 const createPayment = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.createPayment(req.body, req.user!.id, isStaff(req), req.user?.role);
+  const result = await PaymentService.createPayment(
+    req.body,
+    req.user!.id,
+    isStaff(req),
+    req.user?.role,
+    req.user?.email,
+  );
   sendResponse(res, { statusCode: httpStatus.CREATED, success: true, message: "Payment recorded successfully", data: result });
 });
 
@@ -22,7 +28,7 @@ const getPaymentById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const verifyPayment = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.verifyPayment(req.params.id, req.user!.id);
+  const result = await PaymentService.verifyPayment(req.params.id, req.user!.id, req.user?.email);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payment verified successfully", data: result });
 });
 

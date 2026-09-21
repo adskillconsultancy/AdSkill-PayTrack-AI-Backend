@@ -1,6 +1,7 @@
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 import {
   TCreateRolePayload,
   TPermissionGroup,
@@ -101,7 +102,11 @@ const getRoleById = async (id: string) => {
   };
 };
 
-const createRole = async (payload: TCreateRolePayload) => {
+const createRole = async (
+  payload: TCreateRolePayload,
+  actorId?: string,
+  actorEmail?: string,
+) => {
   const existingRole = await prisma.userRole.findUnique({
     where: { name: payload.name },
   });
@@ -130,10 +135,10 @@ const createRole = async (payload: TCreateRolePayload) => {
     }
   }
 
-  return await prisma.$transaction(async (tx) => {
-    let role;
+  const role = await prisma.$transaction(async (tx) => {
+    let createdOrRestoredRole;
     if (existingRole && existingRole.isDeleted) {
-      role = await tx.userRole.update({
+      createdOrRestoredRole = await tx.userRole.update({
         where: { id: existingRole.id },
         data: {
           isDeleted: false,
@@ -141,7 +146,7 @@ const createRole = async (payload: TCreateRolePayload) => {
         },
       });
     } else {
-      role = await tx.userRole.create({
+      createdOrRestoredRole = await tx.userRole.create({
         data: {
           name: payload.name,
         },
@@ -151,19 +156,35 @@ const createRole = async (payload: TCreateRolePayload) => {
     if (payload.permissionIds && payload.permissionIds.length > 0) {
       await tx.rolePermission.createMany({
         data: payload.permissionIds.map((permissionId) => ({
-          roleId: role.id,
+          roleId: createdOrRestoredRole.id,
           permissionId,
         })),
       });
     }
 
-    return role;
+    return createdOrRestoredRole;
   });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "CREATE_ROLE",
+    targetEntity: "UserRole",
+    targetId: role.id,
+    afterValue: {
+      name: role.name,
+      permissionCount: payload.permissionIds?.length ?? 0,
+    },
+  });
+
+  return role;
 };
 
 const updateRolePermissions = async (
   roleId: string,
   payload: TUpdateRolePermissionsPayload,
+  actorId?: string,
+  actorEmail?: string,
 ) => {
   const role = await prisma.userRole.findFirst({
     where: { id: roleId, isDeleted: false },
@@ -207,10 +228,28 @@ const updateRolePermissions = async (
     }
   });
 
-  return await getRoleById(roleId);
+  const updatedRole = await getRoleById(roleId);
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "UPDATE_ROLE_PERMISSIONS",
+    targetEntity: "UserRole",
+    targetId: roleId,
+    afterValue: {
+      roleName: role.name,
+      permissionIds: payload.permissionIds,
+    },
+  });
+
+  return updatedRole;
 };
 
-const deleteRole = async (roleId: string) => {
+const deleteRole = async (
+  roleId: string,
+  actorId?: string,
+  actorEmail?: string,
+) => {
   const role = await prisma.userRole.findFirst({
     where: { id: roleId, isDeleted: false },
     include: {
@@ -247,6 +286,17 @@ const deleteRole = async (roleId: string) => {
     data: {
       isDeleted: true,
       deletedAt: new Date(),
+    },
+  });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "DELETE_ROLE",
+    targetEntity: "UserRole",
+    targetId: roleId,
+    beforeValue: {
+      name: role.name,
     },
   });
 

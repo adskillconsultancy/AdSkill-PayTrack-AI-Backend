@@ -7,7 +7,7 @@ import { ServiceService } from "./service.service";
 
 const createService = catchAsync(async (req: Request, res: Response) => {
   const actorId = req.user!.id;
-  const result = await ServiceService.createService(req.body, actorId);
+  const result = await ServiceService.createService(req.body, actorId, req.user?.email);
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -64,7 +64,7 @@ const getServiceById = catchAsync(async (req: Request, res: Response) => {
 const updateService = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const actorId = req.user!.id;
-  const result = await ServiceService.updateService(id, req.body, actorId);
+  const result = await ServiceService.updateService(id, req.body, actorId, req.user?.email);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -77,7 +77,7 @@ const updateService = catchAsync(async (req: Request, res: Response) => {
 const deleteService = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const actorId = req.user!.id;
-  const result = await ServiceService.deleteService(id, actorId);
+  const result = await ServiceService.deleteService(id, actorId, req.user?.email);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

@@ -9,6 +9,7 @@ const createNote = catchAsync(async (req: Request, res: Response) => {
     req.body,
     req.user!.id,
     req.user?.role,
+    req.user?.email,
   );
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -38,6 +39,7 @@ const updateNote = catchAsync(async (req: Request, res: Response) => {
     req.body,
     req.user!.id,
     req.user?.role,
+    req.user?.email,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -52,6 +54,7 @@ const deleteNote = catchAsync(async (req: Request, res: Response) => {
     req.params.id,
     req.user!.id,
     req.user?.role,
+    req.user?.email,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

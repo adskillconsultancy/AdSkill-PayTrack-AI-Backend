@@ -8,7 +8,12 @@ const isStaff = (req: Request) => req.user?.role !== "CLIENT";
 
 
 const createClientCase = catchAsync(async (req: Request, res: Response) => {
-  const result = await ClientCaseService.createClientCase(req.body, req.user!.id, req.user?.role);
+  const result = await ClientCaseService.createClientCase(
+    req.body,
+    req.user!.id,
+    req.user?.role,
+    req.user?.email,
+  );
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
     success: true,
@@ -44,6 +49,7 @@ const updateCase = catchAsync(async (req: Request, res: Response) => {
     req.user!.id,
     isStaff(req),
     req.user?.role,
+    req.user?.email,
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

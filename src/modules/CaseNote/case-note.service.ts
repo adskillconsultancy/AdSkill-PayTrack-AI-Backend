@@ -2,6 +2,7 @@ import { NoteVisibility, Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 import { TCreateCaseNotePayload, TUpdateCaseNotePayload } from "./case-note.interface";
 
 const authorSelect = {
@@ -21,6 +22,7 @@ const createNote = async (
   payload: TCreateCaseNotePayload,
   authorId: string,
   authorRole?: string,
+  authorEmail?: string,
 ) => {
   // 1. Verify case exists
   const existingCase = await prisma.clientCase.findUnique({
@@ -66,6 +68,19 @@ const createNote = async (
       author: {
         select: authorSelect,
       },
+    },
+  });
+
+  AuditService.writeAuditLog({
+    actorId: authorId,
+    actorEmail: authorEmail,
+    action: "CREATE_NOTE",
+    targetEntity: "CaseNote",
+    targetId: note.id,
+    afterValue: {
+      caseId: note.caseId,
+      visibility: note.visibility,
+      isPinned: note.isPinned,
     },
   });
 
@@ -131,6 +146,7 @@ const updateNote = async (
   payload: TUpdateCaseNotePayload,
   actorId: string,
   actorRole?: string,
+  actorEmail?: string,
 ) => {
   const existingNote = await prisma.caseNote.findUnique({
     where: { id: noteId, isDeleted: false },
@@ -169,6 +185,18 @@ const updateNote = async (
     },
   });
 
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "UPDATE_NOTE",
+    targetEntity: "CaseNote",
+    targetId: updated.id,
+    afterValue: {
+      visibility: updated.visibility,
+      isPinned: updated.isPinned,
+    },
+  });
+
   return updated;
 };
 
@@ -176,6 +204,7 @@ const deleteNote = async (
   noteId: string,
   actorId: string,
   actorRole?: string,
+  actorEmail?: string,
 ) => {
   const existingNote = await prisma.caseNote.findUnique({
     where: { id: noteId, isDeleted: false },
@@ -195,6 +224,18 @@ const deleteNote = async (
     data: {
       isDeleted: true,
       deletedAt: new Date(),
+    },
+  });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "DELETE_NOTE",
+    targetEntity: "CaseNote",
+    targetId: noteId,
+    beforeValue: {
+      caseId: existingNote.caseId,
+      visibility: existingNote.visibility,
     },
   });
 

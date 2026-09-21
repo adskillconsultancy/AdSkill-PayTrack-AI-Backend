@@ -6,7 +6,11 @@ import { userFilterableFields } from "./user.constant";
 import { UserService } from "./user.service";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserService.createUser(req.body);
+  const result = await UserService.createUser(
+    req.body,
+    req.user?.id,
+    req.user?.email,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -71,7 +75,12 @@ const getUserById = catchAsync(async (req: Request, res: Response) => {
 
 const updateUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await UserService.updateUser(id, req.body);
+  const result = await UserService.updateUser(
+    id,
+    req.body,
+    req.user?.id,
+    req.user?.email,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -84,7 +93,11 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
 const deleteUser = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const currentUserId = req.user?.id;
-  const result = await UserService.deleteUser(id, currentUserId);
+  const result = await UserService.deleteUser(
+    id,
+    currentUserId,
+    req.user?.email,
+  );
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -112,6 +125,8 @@ const updateUserPermissions = catchAsync(async (req: Request, res: Response) => 
     id,
     req.body.permissionIds,
     req.body.deniedPermissionIds,
+    req.user?.id,
+    req.user?.email,
   );
 
   sendResponse(res, {

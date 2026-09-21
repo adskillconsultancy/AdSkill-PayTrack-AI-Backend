@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
 import { getPrivateObjectSignedUrl } from "../../lib/r2";
+import { AuditService } from "../Audit/audit.service";
 import { TCreatePaymentPayload, TPaymentFilters } from "./payment.interface";
 
 const paymentInclude = {
@@ -124,6 +125,7 @@ const createPayment = async (
   actorId: string,
   staff: boolean,
   userRole?: string,
+  actorEmail?: string,
 ) => {
   await ensureCase(payload.caseId, actorId, staff, userRole);
   const amount = new Prisma.Decimal(payload.amount);
@@ -162,13 +164,13 @@ const createPayment = async (
     }
   }
 
-  return prisma.$transaction(
+  const payment = await prisma.$transaction(
     async (tx) => {
       const isVerifiableStaff = userRole === "SUPER_ADMIN" || userRole === "MANAGER";
       const isVerified = isVerifiableStaff && payload.status !== "PENDING";
       const initialStatus = isVerified ? "VERIFIED" : "PENDING";
 
-      const payment = await tx.payment.create({
+      const paymentRecord = await tx.payment.create({
         data: {
           caseId: payload.caseId,
           installmentId: payload.installmentId,
@@ -188,7 +190,7 @@ const createPayment = async (
       if (payload.proofDocumentIds?.length) {
         await tx.document.updateMany({
           where: { id: { in: payload.proofDocumentIds }, caseId: payload.caseId },
-          data: { paymentId: payment.id },
+          data: { paymentId: paymentRecord.id },
         });
       }
 
@@ -199,13 +201,31 @@ const createPayment = async (
         await refreshFinancialStatus(tx, payload.caseId);
       }
 
-      return payment;
+      return paymentRecord;
     },
     {
       maxWait: 10000,
       timeout: 25000,
     },
   );
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "RECORD_PAYMENT",
+    targetEntity: "Payment",
+    targetId: payment.id,
+    afterValue: {
+      amount: payment.amount.toString(),
+      currency: payment.currency,
+      status: payment.status,
+      caseId: payment.caseId,
+      installmentId: payment.installmentId,
+      paymentMethod: payment.paymentMethod,
+    },
+  });
+
+  return payment;
 };
 
 const listPayments = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => {
@@ -217,15 +237,15 @@ const listPayments = async (caseId: string, actorId: string, staff: boolean, use
   });
 };
 
-const verifyPayment = async (id: string, actorId: string) => {
-  return prisma.$transaction(
+const verifyPayment = async (id: string, actorId: string, actorEmail?: string) => {
+  const updated = await prisma.$transaction(
     async (tx) => {
       const payment = await tx.payment.findFirst({ where: { id, isDeleted: false } });
       if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
       if (payment.status !== "PENDING") {
         throw new AppError(httpStatus.BAD_REQUEST, "Only pending payments can be verified");
       }
-      const updated = await tx.payment.update({
+      const updatedRecord = await tx.payment.update({
         where: { id },
         data: { status: "VERIFIED", verifiedById: actorId },
         include: paymentInclude,
@@ -234,13 +254,30 @@ const verifyPayment = async (id: string, actorId: string) => {
         await refreshInstallmentStatus(tx, payment.installmentId);
       }
       await refreshFinancialStatus(tx, payment.caseId);
-      return updated;
+      return updatedRecord;
     },
     {
       maxWait: 10000,
       timeout: 25000,
     },
   );
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "VERIFY_PAYMENT",
+    targetEntity: "Payment",
+    targetId: updated.id,
+    beforeValue: { status: "PENDING" },
+    afterValue: {
+      status: "VERIFIED",
+      verifiedById: actorId,
+      amount: updated.amount.toString(),
+      currency: updated.currency,
+    },
+  });
+
+  return updated;
 };
 
 const getPaymentById = async (id: string, actorId: string, staff: boolean, userRole?: string) => {

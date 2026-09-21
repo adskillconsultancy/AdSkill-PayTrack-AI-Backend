@@ -9,6 +9,7 @@ import {
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 import {
   TCreateSupportInquiryPayload,
   TCreateSupportTicketPayload,
@@ -317,6 +318,21 @@ const createTicket = async (
           },
         },
       },
+    },
+  });
+
+  AuditService.writeAuditLog({
+    actorId: userId,
+    action: "CREATE_SUPPORT_TICKET",
+    targetEntity: "SupportTicket",
+    targetId: ticket.id,
+    afterValue: {
+      ticketCode: ticket.ticketCode,
+      subject: ticket.subject,
+      priority: ticket.priority,
+      category: ticket.category,
+      status: ticket.status,
+      targetType: ticket.targetType,
     },
   });
 
@@ -772,6 +788,17 @@ const sendMessage = async (
     },
   });
 
+  AuditService.writeAuditLog({
+    actorId: user.id,
+    action: "SEND_SUPPORT_MESSAGE",
+    targetEntity: "SupportMessage",
+    targetId: newMessage.id,
+    afterValue: {
+      ticketId: ticket.id,
+      isStaffReply,
+    },
+  });
+
   return {
     success: true,
     message: "Message delivered successfully",
@@ -797,7 +824,7 @@ const updateTicketStatus = async (
 
   const existingTicket = await prisma.supportTicket.findFirst({
     where: { id: ticketId, isDeleted: false },
-    select: { id: true },
+    select: { id: true, status: true, assignedStaffId: true },
   });
 
   if (!existingTicket) {
@@ -819,6 +846,21 @@ const updateTicketStatus = async (
           role: { select: { name: true } },
         },
       },
+    },
+  });
+
+  AuditService.writeAuditLog({
+    actorId: user.id,
+    action: "UPDATE_TICKET_STATUS",
+    targetEntity: "SupportTicket",
+    targetId: updatedTicket.id,
+    beforeValue: {
+      status: existingTicket.status,
+      assignedStaffId: existingTicket.assignedStaffId,
+    },
+    afterValue: {
+      status: updatedTicket.status,
+      assignedStaffId: updatedTicket.assignedStaffId,
     },
   });
 

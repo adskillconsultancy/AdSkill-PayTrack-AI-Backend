@@ -16,6 +16,7 @@ import {
   IPaginationOptions,
 } from "../../shared/paginationHelper";
 import { userSearchableFields, userSortableFields } from "./user.constant";
+import { AuditService } from "../Audit/audit.service";
 import {
   TCreateUserPayload,
   TUpdateUserPayload,
@@ -79,7 +80,11 @@ const generateClientId = async (): Promise<string> => {
   return clientId;
 };
 
-const createUser = async (payload: TCreateUserPayload) => {
+const createUser = async (
+  payload: TCreateUserPayload,
+  actorId?: string,
+  actorEmail?: string,
+) => {
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
     where: { email: payload.email },
@@ -201,6 +206,21 @@ const createUser = async (payload: TCreateUserPayload) => {
         : {}),
     },
     select: safeUserSelect,
+  });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "CREATE_USER",
+    targetEntity: "User",
+    targetId: result.id,
+    afterValue: {
+      name: result.name,
+      email: result.email,
+      role: result.role?.name,
+      clientId: result.clientId,
+      status: result.status,
+    },
   });
 
   return result;
@@ -359,6 +379,8 @@ const getUserById = async (
 const updateUser = async (
   idOrClientId: string,
   payload: TUpdateUserPayload,
+  actorId?: string,
+  actorEmail?: string,
 ) => {
   // Check if user exists and is not soft deleted (resolves actual UUID)
   const existingUser = await getUserById(idOrClientId);
@@ -397,11 +419,36 @@ const updateUser = async (
     select: safeUserSelect,
   });
 
+  const isRoleChange = Boolean(roleName || payload.roleId);
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: isRoleChange ? "UPDATE_USER_ROLE" : "UPDATE_USER",
+    targetEntity: "User",
+    targetId: result.id,
+    beforeValue: {
+      name: existingUser.name,
+      email: existingUser.email,
+      role: existingUser.role?.name,
+      status: existingUser.status,
+    },
+    afterValue: {
+      name: result.name,
+      email: result.email,
+      role: result.role?.name,
+      status: result.status,
+    },
+  });
+
   return result;
 };
 
 // Universal Soft Delete implementation (Never hard delete user records)
-const deleteUser = async (idOrClientId: string, currentUserId?: string) => {
+const deleteUser = async (
+  idOrClientId: string,
+  currentUserId?: string,
+  actorEmail?: string,
+) => {
   // Check if user exists and is not already deleted (resolves actual UUID)
   const existingUser = await getUserById(idOrClientId);
 
@@ -423,6 +470,16 @@ const deleteUser = async (idOrClientId: string, currentUserId?: string) => {
       status: "INACTIVE",
     },
     select: safeUserSelect,
+  });
+
+  AuditService.writeAuditLog({
+    actorId: currentUserId,
+    actorEmail,
+    action: "DEACTIVATE_USER",
+    targetEntity: "User",
+    targetId: existingUser.id,
+    beforeValue: { status: existingUser.status, isDeleted: false },
+    afterValue: { status: "INACTIVE", isDeleted: true },
   });
 
   return result;
@@ -524,6 +581,8 @@ const updateUserDirectPermissions = async (
   idOrClientId: string,
   permissionIds: string[] = [],
   deniedPermissionIds: string[] = [],
+  actorId?: string,
+  actorEmail?: string,
 ) => {
   const user = await getUserById(idOrClientId);
   const resolvedUserId = user.id;
@@ -579,7 +638,22 @@ const updateUserDirectPermissions = async (
     }
   });
 
-  return await getUserEffectivePermissions(resolvedUserId);
+  const effective = await getUserEffectivePermissions(resolvedUserId);
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "UPDATE_USER_PERMISSIONS",
+    targetEntity: "User",
+    targetId: resolvedUserId,
+    afterValue: {
+      permissionIds,
+      deniedPermissionIds,
+      effectivePermissions: effective.effectivePermissions,
+    },
+  });
+
+  return effective;
 };
 
 export const UserService = {

@@ -13,6 +13,7 @@ import {
   calculatePagination,
   IPaginationOptions,
 } from "../../shared/paginationHelper";
+import { AuditService } from "../Audit/audit.service";
 import { serviceSearchableFields, serviceSortableFields } from "./service.constant";
 import {
   TCreateServicePayload,
@@ -107,7 +108,11 @@ const generateSKU = async (name: string): Promise<string> => {
   return sku || `${cleanPrefix}-${Date.now().toString().slice(-6)}`;
 };
 
-const createService = async (payload: TCreateServicePayload, actorId: string) => {
+const createService = async (
+  payload: TCreateServicePayload,
+  actorId: string,
+  actorEmail?: string,
+) => {
   // Check unique constraints for name
   const existingByName = await prisma.service.findFirst({
     where: {
@@ -164,6 +169,22 @@ const createService = async (payload: TCreateServicePayload, actorId: string) =>
       createdById: actorId,
     },
     select: serviceSelect,
+  });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "CREATE_SERVICE",
+    targetEntity: "Service",
+    targetId: result.id,
+    afterValue: {
+      name: result.name,
+      code: result.code,
+      category: result.category,
+      baseFee: result.baseFee.toString(),
+      currency: result.currency,
+      isActive: result.isActive,
+    },
   });
 
   return withTotalCost(result);
@@ -275,6 +296,7 @@ const updateService = async (
   id: string,
   payload: TUpdateServicePayload,
   actorId: string,
+  actorEmail?: string,
 ) => {
   const existingService = await prisma.service.findFirst({
     where: { id, isDeleted: false },
@@ -361,10 +383,30 @@ const updateService = async (
     select: serviceSelect,
   });
 
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "UPDATE_SERVICE",
+    targetEntity: "Service",
+    targetId: result.id,
+    beforeValue: {
+      name: existingService.name,
+      code: existingService.code,
+      baseFee: existingService.baseFee.toString(),
+      isActive: existingService.isActive,
+    },
+    afterValue: {
+      name: result.name,
+      code: result.code,
+      baseFee: result.baseFee.toString(),
+      isActive: result.isActive,
+    },
+  });
+
   return withTotalCost(result);
 };
 
-const deleteService = async (id: string, actorId: string) => {
+const deleteService = async (id: string, actorId: string, actorEmail?: string) => {
   const existingService = await prisma.service.findFirst({
     where: { id, isDeleted: false },
   });
@@ -381,6 +423,23 @@ const deleteService = async (id: string, actorId: string) => {
       updatedById: actorId,
     },
     select: serviceSelect,
+  });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "DELETE_SERVICE",
+    targetEntity: "Service",
+    targetId: id,
+    beforeValue: {
+      name: existingService.name,
+      code: existingService.code,
+      isDeleted: false,
+    },
+    afterValue: {
+      isDeleted: true,
+      deletedAt: new Date().toISOString(),
+    },
   });
 
   return withTotalCost(result);

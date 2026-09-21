@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 import { TCreateClientCasePayload, TUpdateClientCasePayload } from "./client-case.interface";
 
 const caseSelect = {
@@ -112,6 +113,7 @@ const createClientCase = async (
   payload: TCreateClientCasePayload,
   actorUserId: string,
   userRole?: string,
+  actorEmail?: string,
 ) => {
   const isStaff = userRole !== "CLIENT";
   const targetUserId = (isStaff && payload.userId) ? payload.userId : actorUserId;
@@ -192,6 +194,23 @@ const createClientCase = async (
     });
   }
 
+  AuditService.writeAuditLog({
+    actorId: actorUserId,
+    actorEmail,
+    action: "CREATE_CLIENT_CASE",
+    targetEntity: "ClientCase",
+    targetId: created.id,
+    afterValue: {
+      caseCode: created.caseCode,
+      caseCategory: created.caseCategory,
+      destinationCountry: created.destinationCountry,
+      caseStatus: created.caseStatus,
+      clientId: created.user?.clientId,
+      clientName: created.user?.name,
+      serviceName: created.serviceNameSnapshot,
+    },
+  });
+
   return sanitizeCaseNotes(created, userRole);
 };
 
@@ -227,10 +246,11 @@ const updateCase = async (
   userId: string,
   staff = false,
   userRole?: string,
+  actorEmail?: string,
 ) => {
   const existing = await prisma.clientCase.findFirst({
     where: { id, isDeleted: false },
-    select: { userId: true, assignedConsultantId: true },
+    select: { userId: true, assignedConsultantId: true, caseStatus: true, caseCode: true },
   });
   if (!existing) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   ensureOwnerOrStaff(existing, userId, staff);
@@ -268,6 +288,25 @@ const updateCase = async (
   }
 
   const updated = await prisma.clientCase.update({ where: { id }, data, select: caseSelect });
+
+  AuditService.writeAuditLog({
+    actorId: userId,
+    actorEmail,
+    action: "UPDATE_CLIENT_CASE",
+    targetEntity: "ClientCase",
+    targetId: updated.id,
+    beforeValue: {
+      caseStatus: existing.caseStatus,
+      assignedConsultantId: existing.assignedConsultantId,
+    },
+    afterValue: {
+      caseCode: updated.caseCode,
+      caseStatus: updated.caseStatus,
+      destinationCountry: updated.destinationCountry,
+      assignedConsultantId: updated.assignedConsultant?.id,
+    },
+  });
+
   return sanitizeCaseNotes(updated, userRole);
 };
 

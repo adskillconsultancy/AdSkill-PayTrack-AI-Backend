@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 import { TCreatePaymentPlanPayload } from "./payment-plan.interface";
 
 const planInclude = {
@@ -38,6 +39,7 @@ const createPaymentPlan = async (
   payload: TCreatePaymentPlanPayload,
   actorId: string,
   userRole?: string,
+  actorEmail?: string,
 ) => {
   await ensureCaseAccess(caseId, actorId, true, userRole);
   const serviceCase = await prisma.clientCase.findUnique({
@@ -68,8 +70,8 @@ const createPaymentPlan = async (
     throw new AppError(httpStatus.BAD_REQUEST, "Installments must equal contracted fee");
   }
 
-  return prisma.$transaction(async (tx) => {
-    const plan = await tx.paymentPlan.create({
+  const plan = await prisma.$transaction(async (tx) => {
+    const createdPlan = await tx.paymentPlan.create({
       data: {
         caseId,
         currency: (payload.currency ?? serviceCase.service.currency).toUpperCase(),
@@ -93,8 +95,25 @@ const createPaymentPlan = async (
       },
       include: planInclude,
     });
-    return plan;
+    return createdPlan;
   });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "CREATE_PAYMENT_PLAN",
+    targetEntity: "PaymentPlan",
+    targetId: plan.id,
+    afterValue: {
+      caseId: plan.caseId,
+      contractedFee: plan.contractedFee.toString(),
+      currency: plan.currency,
+      scheduleType: plan.scheduleType,
+      installmentsCount: plan.installments?.length,
+    },
+  });
+
+  return plan;
 };
 
 const getPaymentPlanById = async (id: string, actorId: string, staff: boolean, userRole?: string) => {

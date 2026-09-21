@@ -28,7 +28,7 @@ const getRoleById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const createRole = catchAsync(async (req: Request, res: Response) => {
-  const result = await RoleService.createRole(req.body);
+  const result = await RoleService.createRole(req.body, req.user?.id, req.user?.email);
 
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -41,7 +41,12 @@ const createRole = catchAsync(async (req: Request, res: Response) => {
 const updateRolePermissions = catchAsync(
   async (req: Request, res: Response) => {
     const { id } = req.params;
-    const result = await RoleService.updateRolePermissions(id, req.body);
+    const result = await RoleService.updateRolePermissions(
+      id,
+      req.body,
+      req.user?.id,
+      req.user?.email,
+    );
 
     sendResponse(res, {
       statusCode: httpStatus.OK,
@@ -54,7 +59,7 @@ const updateRolePermissions = catchAsync(
 
 const deleteRole = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const result = await RoleService.deleteRole(id);
+  const result = await RoleService.deleteRole(id, req.user?.id, req.user?.email);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,

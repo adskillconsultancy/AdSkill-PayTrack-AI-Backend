@@ -8,6 +8,7 @@ import {
   uploadPrivateObject,
 } from "../../lib/r2";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 import { UPLOAD_FOLDERS } from "./upload.constant";
 import { TUploadedDocument } from "./upload.interface";
 
@@ -146,6 +147,19 @@ const uploadCaseDocuments = async (
         signedDownloadUrl: await getPrivateObjectSignedUrl(key),
         signedUrlExpiresIn: config.r2.signed_url_expires_in,
       });
+
+      AuditService.writeAuditLog({
+        actorId,
+        action: "UPLOAD_DOCUMENT",
+        targetEntity: "Document",
+        targetId: document.id,
+        afterValue: {
+          caseId,
+          documentType,
+          originalName: file.originalname,
+          size: file.size,
+        },
+      });
     }
     return results;
   } catch (error) {
@@ -208,6 +222,19 @@ const deleteDocument = async (documentId: string, actorId: string, userRole?: st
   }
   await prisma.document.update({ where: { id: documentId }, data: { isDeleted: true, deletedAt: new Date() } });
   await deletePrivateObject(document.objectKey);
+
+  AuditService.writeAuditLog({
+    actorId,
+    action: "DELETE_DOCUMENT",
+    targetEntity: "Document",
+    targetId: documentId,
+    beforeValue: {
+      originalName: document.originalName,
+      documentType: document.documentType,
+      caseId: document.caseId,
+    },
+  });
+
   return { id: document.id, deleted: true };
 };
 const getDocumentDownload = async (documentId: string, actorId: string, userRole?: string) => {

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import { AuditService } from "../Audit/audit.service";
 
 const include = { case: { select: { id: true, caseCode: true, userId: true, serviceNameSnapshot: true, assignedConsultantId: true } } };
 const access = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => {
@@ -11,14 +12,30 @@ const access = async (caseId: string, actorId: string, staff: boolean, userRole?
   if (!staff && item.userId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You cannot access this case");
   if (userRole === "CONSULTANT" && item.assignedConsultantId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this case");
 };
-const generateInvoice = async (caseId: string, actorId: string, userRole?: string) => {
+const generateInvoice = async (caseId: string, actorId: string, userRole?: string, actorEmail?: string) => {
   await access(caseId, actorId, true, userRole);
-  return prisma.$transaction(async (tx) => {
+  const invoice = await prisma.$transaction(async (tx) => {
     const plan = await tx.paymentPlan.findFirst({ where: { caseId, isDeleted: false, isActive: true }, orderBy: { createdAt: "desc" }, select: { contractedFee: true, currency: true } });
     if (!plan) throw new AppError(httpStatus.BAD_REQUEST, "Active payment plan required");
     const number = `INV-${new Date().getUTCFullYear()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
     return tx.invoice.create({ data: { caseId, invoiceNumber: number, currency: plan.currency, amount: new Prisma.Decimal(plan.contractedFee) }, include });
   });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "GENERATE_INVOICE",
+    targetEntity: "Invoice",
+    targetId: invoice.id,
+    afterValue: {
+      invoiceNumber: invoice.invoiceNumber,
+      amount: invoice.amount.toString(),
+      currency: invoice.currency,
+      caseId: invoice.caseId,
+    },
+  });
+
+  return invoice;
 };
 const listInvoices = async (caseId: string, actorId: string, staff: boolean, userRole?: string) => { await access(caseId, actorId, staff, userRole); return prisma.invoice.findMany({ where: { caseId, isDeleted: false }, include, orderBy: { issuedAt: "desc" } }); };
 const getInvoice = async (id: string, actorId: string, staff: boolean, userRole?: string) => { const item = await prisma.invoice.findFirst({ where: { id, isDeleted: false }, include }); if (!item) throw new AppError(httpStatus.NOT_FOUND, "Invoice not found"); if (!staff && item.case.userId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You cannot access this invoice"); if (userRole === "CONSULTANT" && item.case.assignedConsultantId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this case"); return item; };

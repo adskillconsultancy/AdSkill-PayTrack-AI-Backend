@@ -53,6 +53,9 @@ export const CANONICAL_PERMISSIONS = [
   { name: 'note:read', module: 'NOTE', description: 'View client-visible notes' },
   { name: 'note:create', module: 'NOTE', description: 'Create client or internal notes' },
   { name: 'note:read-internal', module: 'NOTE', description: 'View confidential internal staff notes' },
+
+  // Audit Log — Super Admin Only
+  { name: 'audit:read', module: 'AUDIT', description: 'View immutable system audit log (Super Admin only)' },
 ];
 
 // Role to Permission Mappings

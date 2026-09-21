@@ -58,6 +58,9 @@ export const PERMISSIONS = {
   NOTE_READ: "note:read",
   NOTE_CREATE: "note:create",
   NOTE_READ_INTERNAL: "note:read-internal",
+
+  // Audit Log (Super Admin only)
+  AUDIT_READ: "audit:read",
 } as const;
 
 export const userSearchableFields: string[] = [
