@@ -334,9 +334,15 @@ const getAllCases = async (
       { caseCode: { contains: q, mode: "insensitive" } },
       { destinationCountry: { contains: q, mode: "insensitive" } },
       { caseCategory: { contains: q, mode: "insensitive" } },
+      { serviceNameSnapshot: { contains: q, mode: "insensitive" } },
+      { serviceCodeSnapshot: { contains: q, mode: "insensitive" } },
       { user: { name: { contains: q, mode: "insensitive" } } },
       { user: { email: { contains: q, mode: "insensitive" } } },
       { user: { clientId: { contains: q, mode: "insensitive" } } },
+      { user: { phone: { contains: q, mode: "insensitive" } } },
+      { user: { whatsapp: { contains: q, mode: "insensitive" } } },
+      { assignedConsultant: { name: { contains: q, mode: "insensitive" } } },
+      { assignedConsultant: { email: { contains: q, mode: "insensitive" } } },
     ];
   }
 

@@ -339,16 +339,22 @@ const getAllPayments = async (
     whereCondition.OR = [
       { externalReference: { contains: term, mode: "insensitive" } },
       { operationalNotes: { contains: term, mode: "insensitive" } },
+      { paymentMethod: { contains: term, mode: "insensitive" } },
+      { receipts: { some: { receiptNumber: { contains: term, mode: "insensitive" } } } },
       {
         case: {
           OR: [
             { caseCode: { contains: term, mode: "insensitive" } },
+            { serviceNameSnapshot: { contains: term, mode: "insensitive" } },
+            { invoices: { some: { invoiceNumber: { contains: term, mode: "insensitive" } } } },
+            { assignedConsultant: { name: { contains: term, mode: "insensitive" } } },
             {
               user: {
                 OR: [
                   { name: { contains: term, mode: "insensitive" } },
                   { email: { contains: term, mode: "insensitive" } },
                   { clientId: { contains: term, mode: "insensitive" } },
+                  { phone: { contains: term, mode: "insensitive" } },
                 ],
               },
             },
