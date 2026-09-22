@@ -406,6 +406,7 @@ model Invoice {
   currency        String
   amount          Decimal  @db.Decimal(12, 2)
   status          String   @default("ISSUED")
+  dueAt           DateTime?
   issuedAt        DateTime @default(now())
   isDeleted       Boolean  @default(false)
   deletedAt       DateTime?
@@ -417,6 +418,24 @@ model Invoice {
   @@map("invoices")
 }
 
+// Sequential counter for invoice numbering per year (INV-2026-00001)
+model InvoiceCounter {
+  id        String   @id @default(uuid())
+  year      Int      @unique
+  lastSeq   Int      @default(0)
+
+  @@map("invoice_counters")
+}
+
+// Sequential counter for receipt numbering per year (RCT-2026-00001)
+model ReceiptCounter {
+  id        String   @id @default(uuid())
+  year      Int      @unique
+  lastSeq   Int      @default(0)
+
+  @@map("receipt_counters")
+}
+
 model Receipt {
   id              String   @id @default(uuid())
   caseId          String
@@ -425,6 +444,7 @@ model Receipt {
   receiptNumber   String   @unique
   currency        String
   amount          Decimal  @db.Decimal(12, 2)
+  status          String   @default("PAID") // PAID (receipts only generated for verified payments)
   issuedAt        DateTime @default(now())
   isDeleted       Boolean  @default(false)
   deletedAt       DateTime?

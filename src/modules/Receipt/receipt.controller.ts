@@ -3,8 +3,39 @@ import httpStatus from "http-status";
 import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { ReceiptService } from "./receipt.service";
+
 const staff = (req: Request) => req.user?.role !== "CLIENT";
-const createReceipt = catchAsync(async (req: Request, res: Response) => { const data = await ReceiptService.createReceipt(req.params.paymentId, req.user!.id, req.user?.role, req.user?.email); sendResponse(res, { statusCode: httpStatus.CREATED, success: true, message: "Receipt generated successfully", data }); });
-const listReceipts = catchAsync(async (req: Request, res: Response) => { const data = await ReceiptService.listReceipts(req.params.caseId, req.user!.id, staff(req), req.user?.role); sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipts retrieved successfully", data }); });
-const getReceipt = catchAsync(async (req: Request, res: Response) => { const data = await ReceiptService.getReceipt(req.params.id, req.user!.id, staff(req), req.user?.role); sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipt retrieved successfully", data }); });
-export const ReceiptController = { createReceipt, listReceipts, getReceipt };
+
+const createReceipt = catchAsync(async (req: Request, res: Response) => {
+  const data = await ReceiptService.createReceipt(req.params.paymentId, req.user!.id, req.user?.role, req.user?.email);
+  sendResponse(res, { statusCode: httpStatus.CREATED, success: true, message: "Receipt generated successfully", data });
+});
+
+const listReceipts = catchAsync(async (req: Request, res: Response) => {
+  const data = await ReceiptService.listReceipts(req.params.caseId, req.user!.id, staff(req), req.user?.role);
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipts retrieved successfully", data });
+});
+
+const getReceipt = catchAsync(async (req: Request, res: Response) => {
+  const data = await ReceiptService.getReceipt(req.params.id, req.user!.id, staff(req), req.user?.role);
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipt retrieved successfully", data });
+});
+
+const downloadReceiptPdf = catchAsync(async (req: Request, res: Response) => {
+  const pdfBuffer = await ReceiptService.generateReceiptPdf(
+    req.params.id,
+    req.user!.id,
+    staff(req),
+    req.user?.role,
+    req.user?.email
+  );
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="receipt-${req.params.id}.pdf"`,
+    "Content-Length": pdfBuffer.length,
+    "Cache-Control": "no-store",
+  });
+  res.send(pdfBuffer);
+});
+
+export const ReceiptController = { createReceipt, listReceipts, getReceipt, downloadReceiptPdf };

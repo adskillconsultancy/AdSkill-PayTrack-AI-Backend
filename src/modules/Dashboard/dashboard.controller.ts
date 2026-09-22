@@ -97,6 +97,18 @@ const getRecentActivity = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getClientSummary = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user?.id as string;
+  const result = await DashboardService.getClientSummary(userId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Client dashboard summary retrieved successfully",
+    data: result,
+  });
+});
+
 export const DashboardController = {
   getKPIs,
   getPaymentAnalytics,
@@ -104,4 +116,6 @@ export const DashboardController = {
   getVerificationQueue,
   getCaseDistribution,
   getRecentActivity,
+  getClientSummary,
 };
+

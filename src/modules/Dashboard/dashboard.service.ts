@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../../lib/prisma";
 import { getDateRangeForPeriod } from "./dashboard.constant";
+import { ADSKILL } from "../../lib/pdf.util";
 import {
   TDashboardCaseDistribution,
   TDashboardClientGrowth,
@@ -11,6 +12,12 @@ import {
   TDashboardVerificationQueueItem,
   TDailyFinancialTrend,
   TDailyGrowthTrend,
+  TClientDashboardSummary,
+  TClientInstallmentItem,
+  TClientPaymentHistoryItem,
+  TClientInvoiceItem,
+  TClientReceiptItem,
+  TAdSkillContactInfo,
 } from "./dashboard.interface";
 
 /**
@@ -512,6 +519,183 @@ const getRecentActivity = async (
   }));
 };
 
+/**
+ * 7. Client Portal Summary
+ * Dedicated real-time summary for clients: case, contracted fees, milestone schedule,
+ * payment history, and downloadable invoices and receipts.
+ */
+const getClientSummary = async (userId: string): Promise<TClientDashboardSummary> => {
+  const activeCase = await prisma.clientCase.findFirst({
+    where: {
+      userId,
+      isDeleted: false,
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      service: {
+        select: {
+          name: true,
+          code: true,
+          category: true,
+          baseFee: true,
+          currency: true,
+        },
+      },
+      paymentPlans: {
+        where: { isDeleted: false, isActive: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: {
+          installments: {
+            where: { isDeleted: false },
+            orderBy: { sequenceNumber: "asc" },
+          },
+        },
+      },
+      payments: {
+        where: { isDeleted: false },
+        orderBy: { paymentDate: "desc" },
+        include: {
+          receipts: {
+            where: { isDeleted: false },
+            take: 1,
+            select: { id: true, receiptNumber: true },
+          },
+        },
+      },
+      invoices: {
+        where: { isDeleted: false },
+        orderBy: { issuedAt: "desc" },
+      },
+      receipts: {
+        where: { isDeleted: false },
+        orderBy: { issuedAt: "desc" },
+      },
+    },
+  });
+
+  const contactInfo: TAdSkillContactInfo = {
+    legalName: ADSKILL.legalName,
+    address: `${ADSKILL.address}, ${ADSKILL.cityState}, ${ADSKILL.country}`,
+    email: ADSKILL.email,
+    phone: ADSKILL.phone,
+    whatsapp: "+1 (800) 235-7454",
+    portalUrl: "https://portal.adskillconsultancy.com",
+  };
+
+  const feeDisclaimer =
+    "AdSkill professional fees cover dedicated case preparation, document curation, and management advisory services. Professional fees are strictly separate from government filing fees (USCIS/consular) and third-party fees (credential evaluations, certified translations, business plans) unless expressly itemized in your signed client services agreement.";
+
+  if (!activeCase) {
+    return {
+      hasActiveCase: false,
+      caseId: null,
+      caseCode: null,
+      serviceName: null,
+      serviceCategory: null,
+      currency: "USD",
+      caseStatus: null,
+      financialStatus: null,
+      totalProfessionalFee: 0,
+      totalPaid: 0,
+      remainingBalance: 0,
+      nextPaymentAmount: null,
+      nextDueDate: null,
+      nextInstallmentTitle: null,
+      nextInstallmentSequence: null,
+      schedule: [],
+      paymentHistory: [],
+      invoices: [],
+      receipts: [],
+      adskillContact: contactInfo,
+      feeDisclaimer,
+    };
+  }
+
+  const plan = activeCase.paymentPlans?.[0];
+  const currency = plan?.currency || activeCase.service?.currency || "USD";
+  const totalProfessionalFee = plan ? Number(plan.contractedFee) : Number(activeCase.service?.baseFee || 0);
+
+  // Calculate total verified paid
+  const verifiedPayments = activeCase.payments.filter((p) => p.status === "VERIFIED");
+  const totalPaid = verifiedPayments.reduce((acc, curr) => acc + Number(curr.amount), 0);
+  const remainingBalance = Math.max(0, totalProfessionalFee - totalPaid);
+
+  // Find next unpaid installment
+  const now = new Date();
+  const rawInstallments = plan?.installments || [];
+  const unpaidInstallment = rawInstallments.find((inst) => inst.status !== "PAID");
+
+  const schedule: TClientInstallmentItem[] = rawInstallments.map((inst) => {
+    const dueDateObj = new Date(inst.dueDate);
+    const isOverdue = inst.status !== "PAID" && dueDateObj < now;
+    return {
+      id: inst.id,
+      sequenceNumber: inst.sequenceNumber,
+      title: inst.title,
+      amount: Number(inst.amount),
+      dueDate: inst.dueDate.toISOString(),
+      status: isOverdue ? "OVERDUE" : inst.status,
+      isOverdue,
+    };
+  });
+
+  const paymentHistory: TClientPaymentHistoryItem[] = activeCase.payments.map((p) => ({
+    id: p.id,
+    amount: Number(p.amount),
+    currency: p.currency,
+    paymentDate: p.paymentDate.toISOString(),
+    paymentMethod: p.paymentMethod,
+    status: p.status,
+    externalReference: p.externalReference,
+    receiptId: p.receipts?.[0]?.id || null,
+    receiptNumber: p.receipts?.[0]?.receiptNumber || null,
+  }));
+
+  const invoices: TClientInvoiceItem[] = activeCase.invoices.map((inv) => ({
+    id: inv.id,
+    invoiceNumber: inv.invoiceNumber,
+    currency: inv.currency,
+    amount: Number(inv.amount),
+    status: inv.status,
+    issuedAt: inv.issuedAt.toISOString(),
+  }));
+
+  const receipts: TClientReceiptItem[] = activeCase.receipts.map((rec) => ({
+    id: rec.id,
+    receiptNumber: rec.receiptNumber,
+    currency: rec.currency,
+    amount: Number(rec.amount),
+    status: rec.status,
+    issuedAt: rec.issuedAt.toISOString(),
+    paymentId: rec.paymentId,
+  }));
+
+  return {
+    hasActiveCase: true,
+    caseId: activeCase.id,
+    caseCode: activeCase.caseCode,
+    serviceName: activeCase.serviceNameSnapshot || activeCase.service?.name || "Advisory Program",
+    serviceCategory: activeCase.serviceCategorySnapshot || activeCase.service?.category || null,
+    currency,
+    caseStatus: activeCase.caseStatus,
+    financialStatus: activeCase.financialStatus,
+    totalProfessionalFee,
+    totalPaid,
+    remainingBalance,
+    nextPaymentAmount: unpaidInstallment ? Number(unpaidInstallment.amount) : null,
+    nextDueDate: unpaidInstallment ? unpaidInstallment.dueDate.toISOString() : null,
+    nextInstallmentTitle: unpaidInstallment?.title || null,
+    nextInstallmentSequence: unpaidInstallment?.sequenceNumber || null,
+    schedule,
+    paymentHistory,
+    invoices,
+    receipts,
+    adskillContact: contactInfo,
+    feeDisclaimer,
+  };
+};
+
 export const DashboardService = {
   getKPIs,
   getPaymentAnalytics,
@@ -519,4 +703,6 @@ export const DashboardService = {
   getVerificationQueue,
   getCaseDistribution,
   getRecentActivity,
+  getClientSummary,
 };
+

@@ -4,8 +4,32 @@ import validateRequest from "../../middlewares/validateRequest";
 import { PERMISSIONS } from "../User/user.constant";
 import { InvoiceController } from "./invoice.controller";
 import { InvoiceValidation } from "./invoice.validation";
+
 const router = Router();
-router.post("/cases/:caseId", auth(PERMISSIONS.INVOICE_GENERATE), validateRequest(InvoiceValidation.caseInvoiceValidationSchema), InvoiceController.generateInvoice);
-router.get("/cases/:caseId", auth(PERMISSIONS.INVOICE_READ), validateRequest(InvoiceValidation.caseInvoiceValidationSchema), InvoiceController.listInvoices);
-router.get("/:id", auth(PERMISSIONS.INVOICE_READ), validateRequest(InvoiceValidation.invoiceIdValidationSchema), InvoiceController.getInvoice);
+
+router.post(
+  "/cases/:caseId",
+  auth(PERMISSIONS.INVOICE_GENERATE),
+  validateRequest(InvoiceValidation.caseInvoiceValidationSchema),
+  InvoiceController.generateInvoice
+);
+router.get(
+  "/cases/:caseId",
+  auth(PERMISSIONS.INVOICE_READ),
+  validateRequest(InvoiceValidation.caseInvoiceValidationSchema),
+  InvoiceController.listInvoices
+);
+router.get(
+  "/:id/pdf",
+  auth(PERMISSIONS.INVOICE_READ),
+  validateRequest(InvoiceValidation.invoiceIdValidationSchema),
+  InvoiceController.downloadInvoicePdf
+);
+router.get(
+  "/:id",
+  auth(PERMISSIONS.INVOICE_READ),
+  validateRequest(InvoiceValidation.invoiceIdValidationSchema),
+  InvoiceController.getInvoice
+);
+
 export const InvoiceRoutes = router;

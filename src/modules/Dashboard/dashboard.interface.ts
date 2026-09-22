@@ -120,3 +120,78 @@ export interface TDashboardRecentActivityItem {
   reason: string | null;
   createdAt: string;
 }
+
+export interface TClientInstallmentItem {
+  id: string;
+  sequenceNumber: number;
+  title: string | null;
+  amount: number;
+  dueDate: string;
+  status: string;
+  isOverdue: boolean;
+}
+
+export interface TClientPaymentHistoryItem {
+  id: string;
+  amount: number;
+  currency: string;
+  paymentDate: string;
+  paymentMethod: string;
+  status: string;
+  externalReference: string | null;
+  receiptId?: string | null;
+  receiptNumber?: string | null;
+}
+
+export interface TClientInvoiceItem {
+  id: string;
+  invoiceNumber: string;
+  currency: string;
+  amount: number;
+  status: string;
+  issuedAt: string;
+}
+
+export interface TClientReceiptItem {
+  id: string;
+  receiptNumber: string;
+  currency: string;
+  amount: number;
+  status: string;
+  issuedAt: string;
+  paymentId: string | null;
+}
+
+export interface TAdSkillContactInfo {
+  legalName: string;
+  address: string;
+  email: string;
+  phone: string;
+  whatsapp: string;
+  portalUrl: string;
+}
+
+export interface TClientDashboardSummary {
+  hasActiveCase: boolean;
+  caseId: string | null;
+  caseCode: string | null;
+  serviceName: string | null;
+  serviceCategory: string | null;
+  currency: string;
+  caseStatus: string | null;
+  financialStatus: string | null;
+  totalProfessionalFee: number;
+  totalPaid: number;
+  remainingBalance: number;
+  nextPaymentAmount: number | null;
+  nextDueDate: string | null;
+  nextInstallmentTitle: string | null;
+  nextInstallmentSequence: number | null;
+  schedule: TClientInstallmentItem[];
+  paymentHistory: TClientPaymentHistoryItem[];
+  invoices: TClientInvoiceItem[];
+  receipts: TClientReceiptItem[];
+  adskillContact: TAdSkillContactInfo;
+  feeDisclaimer: string;
+}
+

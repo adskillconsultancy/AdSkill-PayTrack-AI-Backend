@@ -4,8 +4,32 @@ import validateRequest from "../../middlewares/validateRequest";
 import { PERMISSIONS } from "../User/user.constant";
 import { ReceiptController } from "./receipt.controller";
 import { ReceiptValidation } from "./receipt.validation";
+
 const router = Router();
-router.post("/payments/:paymentId", auth(PERMISSIONS.RECEIPT_GENERATE), validateRequest(ReceiptValidation.paymentReceiptValidationSchema), ReceiptController.createReceipt);
-router.get("/cases/:caseId", auth(PERMISSIONS.RECEIPT_READ), validateRequest(ReceiptValidation.caseReceiptValidationSchema), ReceiptController.listReceipts);
-router.get("/:id", auth(PERMISSIONS.RECEIPT_READ), validateRequest(ReceiptValidation.receiptIdValidationSchema), ReceiptController.getReceipt);
+
+router.post(
+  "/payments/:paymentId",
+  auth(PERMISSIONS.RECEIPT_GENERATE),
+  validateRequest(ReceiptValidation.paymentReceiptValidationSchema),
+  ReceiptController.createReceipt
+);
+router.get(
+  "/cases/:caseId",
+  auth(PERMISSIONS.RECEIPT_READ),
+  validateRequest(ReceiptValidation.caseReceiptValidationSchema),
+  ReceiptController.listReceipts
+);
+router.get(
+  "/:id/pdf",
+  auth(PERMISSIONS.RECEIPT_READ),
+  validateRequest(ReceiptValidation.receiptIdValidationSchema),
+  ReceiptController.downloadReceiptPdf
+);
+router.get(
+  "/:id",
+  auth(PERMISSIONS.RECEIPT_READ),
+  validateRequest(ReceiptValidation.receiptIdValidationSchema),
+  ReceiptController.getReceipt
+);
+
 export const ReceiptRoutes = router;

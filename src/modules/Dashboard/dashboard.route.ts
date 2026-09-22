@@ -22,7 +22,15 @@ const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
-// Apply auth() and requireSuperAdmin to all dashboard endpoints
+/**
+ * GET /api/v1/dashboard/client-summary
+ * Real-time client dashboard summary: active case, financial standing, schedule,
+ * payment history, and downloadable invoices and receipts.
+ * Accessible by any authenticated client (or staff).
+ */
+router.get("/client-summary", auth(), DashboardController.getClientSummary);
+
+// Apply auth() and requireSuperAdmin to all executive CRM dashboard endpoints below
 router.use(auth(), requireSuperAdmin);
 
 /**
