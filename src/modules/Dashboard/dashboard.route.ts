@@ -1,26 +1,11 @@
-import { NextFunction, Request, Response, Router } from "express";
-import httpStatus from "http-status";
-import AppError from "../../errors/AppError";
+import { Router } from "express";
 import auth from "../../middlewares/auth";
 import validateRequest from "../../middlewares/validateRequest";
+import { PERMISSIONS } from "../User/user.constant";
 import { DashboardController } from "./dashboard.controller";
 import { DashboardValidation } from "./dashboard.validation";
 
 const router = Router();
-
-/**
- * Middleware: Exclusively restrict executive CRM dashboard to SUPER_ADMIN.
- * If another role visits (Clients, Consultants, Managers), return 403 Forbidden with zero data.
- */
-const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (req.user?.role !== "SUPER_ADMIN") {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "Access denied. Executive CRM Dashboard is exclusively restricted to Super Administrators.",
-    );
-  }
-  next();
-};
 
 /**
  * GET /api/v1/dashboard/client-summary
@@ -30,8 +15,8 @@ const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
  */
 router.get("/client-summary", auth(), DashboardController.getClientSummary);
 
-// Apply auth() and requireSuperAdmin to all executive CRM dashboard endpoints below
-router.use(auth(), requireSuperAdmin);
+// Apply PBAC authorization to executive CRM dashboard endpoints below
+router.use(auth(PERMISSIONS.DASHBOARD_VIEW, PERMISSIONS.REPORT_VIEW));
 
 /**
  * GET /api/v1/dashboard/kpis

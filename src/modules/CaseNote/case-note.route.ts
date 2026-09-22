@@ -9,27 +9,27 @@ const router = Router();
 
 router.post(
   "/",
-  auth(PERMISSIONS.NOTE_CREATE, PERMISSIONS.CASE_READ),
+  auth(PERMISSIONS.NOTE_CREATE),
   validateRequest(CaseNoteValidation.createCaseNoteSchema),
   CaseNoteController.createNote,
 );
 
 router.get(
   "/case/:caseId",
-  auth(PERMISSIONS.NOTE_READ, PERMISSIONS.CASE_READ),
+  auth(PERMISSIONS.NOTE_READ),
   CaseNoteController.getCaseNotes,
 );
 
 router.patch(
   "/:id",
-  auth(PERMISSIONS.NOTE_CREATE, PERMISSIONS.CASE_READ),
+  auth(PERMISSIONS.NOTE_CREATE),
   validateRequest(CaseNoteValidation.updateCaseNoteSchema),
   CaseNoteController.updateNote,
 );
 
 router.delete(
   "/:id",
-  auth(PERMISSIONS.NOTE_CREATE, PERMISSIONS.CASE_READ),
+  auth(PERMISSIONS.NOTE_CREATE),
   CaseNoteController.deleteNote,
 );
 

@@ -50,14 +50,23 @@ export const PERMISSIONS = {
   DOCUMENT_UPLOAD: "document:upload",
   DOCUMENT_DELETE: "document:delete",
 
-  // Reports
+  // Reports & Analytics
   REPORT_VIEW: "report:view",
   REPORT_EXPORT: "report:export",
 
-  // Notes
+  // Dashboard
+  DASHBOARD_VIEW: "dashboard:view",
+
+  // Case Notes
   NOTE_READ: "note:read",
   NOTE_CREATE: "note:create",
   NOTE_READ_INTERNAL: "note:read-internal",
+
+  // Support & Messenger
+  SUPPORT_READ: "support:read",
+  SUPPORT_CREATE: "support:create",
+  SUPPORT_REPLY: "support:reply",
+  SUPPORT_MANAGE: "support:manage",
 
   // Audit Log (Super Admin only)
   AUDIT_READ: "audit:read",

@@ -1,33 +1,20 @@
-import { NextFunction, Request, Response, Router } from "express";
-import httpStatus from "http-status";
-import AppError from "../../errors/AppError";
+import { Router } from "express";
 import auth from "../../middlewares/auth";
 import validateRequest from "../../middlewares/validateRequest";
+import { PERMISSIONS } from "../User/user.constant";
 import { ReportController } from "./report.controller";
 import { ReportValidation } from "./report.validation";
 
 const router = Router();
 
-// Middleware: Strictly enforce Super Admin role authorization
-const requireSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
-  if (req.user?.role !== "SUPER_ADMIN") {
-    throw new AppError(
-      httpStatus.FORBIDDEN,
-      "Access denied. Executive management reports are exclusively restricted to Super Administrators.",
-    );
-  }
-  next();
-};
-
 /**
  * POST /api/v1/reports
  * Generates an executive management report and returns KPIs + itemized ledger rows.
- * Restricted strictly to SUPER_ADMIN.
+ * Gated by 'report:view' permission (Super Admin & Manager).
  */
 router.post(
   "/",
-  auth(),
-  requireSuperAdmin,
+  auth(PERMISSIONS.REPORT_VIEW),
   validateRequest(ReportValidation.generateReportSchema),
   ReportController.generateReport,
 );

@@ -49,10 +49,19 @@ export const CANONICAL_PERMISSIONS = [
   { name: 'report:view', module: 'REPORT', description: 'View management dashboard financial metrics' },
   { name: 'report:export', module: 'REPORT', description: 'Export financial reports to CSV, Excel, or PDF' },
 
+  // Dashboard & Executive Intelligence
+  { name: 'dashboard:view', module: 'DASHBOARD', description: 'View management executive dashboard and KPIs' },
+
   // Case Notes & Collaboration
   { name: 'note:read', module: 'NOTE', description: 'View client-visible notes' },
   { name: 'note:create', module: 'NOTE', description: 'Create client or internal notes' },
   { name: 'note:read-internal', module: 'NOTE', description: 'View confidential internal staff notes' },
+
+  // Support & Client Communication Desk
+  { name: 'support:read', module: 'SUPPORT', description: 'View support tickets and messaging threads' },
+  { name: 'support:create', module: 'SUPPORT', description: 'Create support tickets and inquiries' },
+  { name: 'support:reply', module: 'SUPPORT', description: 'Send messages and replies in support tickets' },
+  { name: 'support:manage', module: 'SUPPORT', description: 'Update ticket status, assign staff handler, and close tickets' },
 
   // Audit Log — Super Admin Only
   { name: 'audit:read', module: 'AUDIT', description: 'View immutable system audit log (Super Admin only)' },
@@ -84,9 +93,14 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'receipt:generate',
     'report:view',
     'report:export',
+    'dashboard:view',
     'note:read',
     'note:create',
     'note:read-internal',
+    'support:read',
+    'support:create',
+    'support:reply',
+    'support:manage',
   ],
   CONSULTANT: [
     'user:read',
@@ -103,9 +117,12 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'note:read',
     'note:create',
     'note:read-internal',
+    'support:read',
+    'support:reply',
   ],
   CLIENT: [
     'user:read',
+    'service:read',
     'case:create',
     'case:read',
     'document:read',
@@ -116,6 +133,10 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'invoice:read',
     'receipt:read',
     'note:read',
+    'note:create',
+    'support:read',
+    'support:create',
+    'support:reply',
   ],
 };
 
