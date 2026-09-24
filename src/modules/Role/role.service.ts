@@ -135,35 +135,41 @@ const createRole = async (
     }
   }
 
-  const role = await prisma.$transaction(async (tx) => {
-    let createdOrRestoredRole;
-    if (existingRole && existingRole.isDeleted) {
-      createdOrRestoredRole = await tx.userRole.update({
-        where: { id: existingRole.id },
-        data: {
-          isDeleted: false,
-          deletedAt: null,
-        },
-      });
-    } else {
-      createdOrRestoredRole = await tx.userRole.create({
-        data: {
-          name: payload.name,
-        },
-      });
-    }
+  const role = await prisma.$transaction(
+    async (tx) => {
+      let createdOrRestoredRole;
+      if (existingRole && existingRole.isDeleted) {
+        createdOrRestoredRole = await tx.userRole.update({
+          where: { id: existingRole.id },
+          data: {
+            isDeleted: false,
+            deletedAt: null,
+          },
+        });
+      } else {
+        createdOrRestoredRole = await tx.userRole.create({
+          data: {
+            name: payload.name,
+          },
+        });
+      }
 
-    if (payload.permissionIds && payload.permissionIds.length > 0) {
-      await tx.rolePermission.createMany({
-        data: payload.permissionIds.map((permissionId) => ({
-          roleId: createdOrRestoredRole.id,
-          permissionId,
-        })),
-      });
-    }
+      if (payload.permissionIds && payload.permissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: payload.permissionIds.map((permissionId) => ({
+            roleId: createdOrRestoredRole.id,
+            permissionId,
+          })),
+        });
+      }
 
-    return createdOrRestoredRole;
-  });
+      return createdOrRestoredRole;
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
 
   AuditService.writeAuditLog({
     actorId,
@@ -213,20 +219,26 @@ const updateRolePermissions = async (
   }
 
   // Atomically replace permissions
-  await prisma.$transaction(async (tx) => {
-    await tx.rolePermission.deleteMany({
-      where: { roleId },
-    });
-
-    if (payload.permissionIds.length > 0) {
-      await tx.rolePermission.createMany({
-        data: payload.permissionIds.map((permissionId) => ({
-          roleId,
-          permissionId,
-        })),
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.rolePermission.deleteMany({
+        where: { roleId },
       });
-    }
-  });
+
+      if (payload.permissionIds.length > 0) {
+        await tx.rolePermission.createMany({
+          data: payload.permissionIds.map((permissionId) => ({
+            roleId,
+            permissionId,
+          })),
+        });
+      }
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
 
   const updatedRole = await getRoleById(roleId);
 

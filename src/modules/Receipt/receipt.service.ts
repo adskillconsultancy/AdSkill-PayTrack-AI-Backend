@@ -110,36 +110,42 @@ const nextReceiptNumber = async (tx: Prisma.TransactionClient): Promise<string> 
 
 // ─── Create Receipt ───────────────────────────────────────────────────────────
 const createReceipt = async (paymentId: string, actorId: string, userRole?: string, actorEmail?: string) => {
-  const receipt = await prisma.$transaction(async (tx) => {
-    const payment = await tx.payment.findFirst({
-      where: { id: paymentId, isDeleted: false },
-      select: { id: true, caseId: true, amount: true, currency: true, status: true },
-    });
-    if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
-    if (payment.status !== "VERIFIED") throw new AppError(httpStatus.BAD_REQUEST, "Verified payment required");
-
-    const owner = await tx.clientCase.findUnique({
-      where: { id: payment.caseId },
-      select: { userId: true, assignedConsultantId: true },
-    });
-    if (!owner) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
-    if (userRole === "CONSULTANT" && owner.assignedConsultantId !== actorId) {
-      throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
-    }
-
-    const receiptNumber = await nextReceiptNumber(tx);
-    return tx.receipt.create({
-      data: {
-        caseId: payment.caseId,
-        paymentId,
-        receiptNumber,
-        currency: payment.currency,
-        amount: payment.amount,
-        status: "PAID",
-      },
-      include,
-    });
+  const payment = await prisma.payment.findFirst({
+    where: { id: paymentId, isDeleted: false },
+    select: { id: true, caseId: true, amount: true, currency: true, status: true },
   });
+  if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
+  if (payment.status !== "VERIFIED") throw new AppError(httpStatus.BAD_REQUEST, "Verified payment required");
+
+  const owner = await prisma.clientCase.findUnique({
+    where: { id: payment.caseId },
+    select: { userId: true, assignedConsultantId: true },
+  });
+  if (!owner) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
+  if (userRole === "CONSULTANT" && owner.assignedConsultantId !== actorId) {
+    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
+
+  const receipt = await prisma.$transaction(
+    async (tx) => {
+      const receiptNumber = await nextReceiptNumber(tx);
+      return tx.receipt.create({
+        data: {
+          caseId: payment.caseId,
+          paymentId,
+          receiptNumber,
+          currency: payment.currency,
+          amount: payment.amount,
+          status: "PAID",
+        },
+        include,
+      });
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
 
   AuditService.writeAuditLog({
     actorId,

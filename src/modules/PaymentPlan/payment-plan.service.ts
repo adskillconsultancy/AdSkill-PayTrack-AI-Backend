@@ -70,33 +70,39 @@ const createPaymentPlan = async (
     throw new AppError(httpStatus.BAD_REQUEST, "Installments must equal contracted fee");
   }
 
-  const plan = await prisma.$transaction(async (tx) => {
-    const createdPlan = await tx.paymentPlan.create({
-      data: {
-        caseId,
-        currency: (payload.currency ?? serviceCase.service.currency).toUpperCase(),
-        baseFeeSnapshot: baseFee,
-        discountAmount: discount,
-        discountReason: payload.discountReason,
-        contractedFee,
-        depositAmount: deposit,
-        scheduleType: payload.scheduleType,
-        paymentMethod: payload.paymentMethod,
-        gracePeriodDays: payload.gracePeriodDays ?? 0,
-        latePaymentPolicy: payload.latePaymentPolicy,
-        installments: {
-          create: payload.installments.map((item) => ({
-            sequenceNumber: item.sequenceNumber,
-            title: item.title,
-            amount: new Prisma.Decimal(item.amount),
-            dueDate: new Date(item.dueDate),
-          })),
+  const plan = await prisma.$transaction(
+    async (tx) => {
+      const createdPlan = await tx.paymentPlan.create({
+        data: {
+          caseId,
+          currency: (payload.currency ?? serviceCase.service.currency).toUpperCase(),
+          baseFeeSnapshot: baseFee,
+          discountAmount: discount,
+          discountReason: payload.discountReason,
+          contractedFee,
+          depositAmount: deposit,
+          scheduleType: payload.scheduleType,
+          paymentMethod: payload.paymentMethod,
+          gracePeriodDays: payload.gracePeriodDays ?? 0,
+          latePaymentPolicy: payload.latePaymentPolicy,
+          installments: {
+            create: payload.installments.map((item) => ({
+              sequenceNumber: item.sequenceNumber,
+              title: item.title,
+              amount: new Prisma.Decimal(item.amount),
+              dueDate: new Date(item.dueDate),
+            })),
+          },
         },
-      },
-      include: planInclude,
-    });
-    return createdPlan;
-  });
+        include: planInclude,
+      });
+      return createdPlan;
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
 
   AuditService.writeAuditLog({
     actorId,

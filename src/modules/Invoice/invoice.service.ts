@@ -109,26 +109,32 @@ const nextInvoiceNumber = async (tx: Prisma.TransactionClient): Promise<string> 
 const generateInvoice = async (caseId: string, actorId: string, userRole?: string, actorEmail?: string) => {
   await access(caseId, actorId, true, userRole);
 
-  const invoice = await prisma.$transaction(async (tx) => {
-    const plan = await tx.paymentPlan.findFirst({
-      where: { caseId, isDeleted: false, isActive: true },
-      orderBy: { createdAt: "desc" },
-      select: { contractedFee: true, currency: true },
-    });
-    if (!plan) throw new AppError(httpStatus.BAD_REQUEST, "Active payment plan required");
-
-    const invoiceNumber = await nextInvoiceNumber(tx);
-    return tx.invoice.create({
-      data: {
-        caseId,
-        invoiceNumber,
-        currency: plan.currency,
-        amount: new Prisma.Decimal(plan.contractedFee),
-        status: "ISSUED",
-      },
-      include,
-    });
+  const plan = await prisma.paymentPlan.findFirst({
+    where: { caseId, isDeleted: false, isActive: true },
+    orderBy: { createdAt: "desc" },
+    select: { contractedFee: true, currency: true },
   });
+  if (!plan) throw new AppError(httpStatus.BAD_REQUEST, "Active payment plan required");
+
+  const invoice = await prisma.$transaction(
+    async (tx) => {
+      const invoiceNumber = await nextInvoiceNumber(tx);
+      return tx.invoice.create({
+        data: {
+          caseId,
+          invoiceNumber,
+          currency: plan.currency,
+          amount: new Prisma.Decimal(plan.contractedFee),
+          status: "ISSUED",
+        },
+        include,
+      });
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
 
   AuditService.writeAuditLog({
     actorId,

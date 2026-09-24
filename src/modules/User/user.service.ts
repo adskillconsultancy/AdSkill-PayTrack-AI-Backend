@@ -606,37 +606,43 @@ const updateUserDirectPermissions = async (
   }
 
   // Atomically replace direct permissions
-  await prisma.$transaction(async (tx) => {
-    await tx.userPermission.deleteMany({
-      where: { userId: resolvedUserId },
-    });
-
-    const userPermsToCreate: {
-      userId: string;
-      permissionId: string;
-      isRevoked: boolean;
-    }[] = [];
-    permissionIds.forEach((pid) =>
-      userPermsToCreate.push({
-        userId: resolvedUserId,
-        permissionId: pid,
-        isRevoked: false,
-      }),
-    );
-    deniedPermissionIds.forEach((pid) =>
-      userPermsToCreate.push({
-        userId: resolvedUserId,
-        permissionId: pid,
-        isRevoked: true,
-      }),
-    );
-
-    if (userPermsToCreate.length > 0) {
-      await tx.userPermission.createMany({
-        data: userPermsToCreate,
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.userPermission.deleteMany({
+        where: { userId: resolvedUserId },
       });
-    }
-  });
+
+      const userPermsToCreate: {
+        userId: string;
+        permissionId: string;
+        isRevoked: boolean;
+      }[] = [];
+      permissionIds.forEach((pid) =>
+        userPermsToCreate.push({
+          userId: resolvedUserId,
+          permissionId: pid,
+          isRevoked: false,
+        }),
+      );
+      deniedPermissionIds.forEach((pid) =>
+        userPermsToCreate.push({
+          userId: resolvedUserId,
+          permissionId: pid,
+          isRevoked: true,
+        }),
+      );
+
+      if (userPermsToCreate.length > 0) {
+        await tx.userPermission.createMany({
+          data: userPermsToCreate,
+        });
+      }
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
 
   const effective = await getUserEffectivePermissions(resolvedUserId);
 
