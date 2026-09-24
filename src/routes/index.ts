@@ -16,6 +16,7 @@ import { SupportRoutes } from "../modules/Support/support.route";
 import { AuditRoutes } from "../modules/Audit/audit.route";
 import { DashboardRoutes } from "../modules/Dashboard/dashboard.route";
 import { SearchRoutes } from "../modules/Search/search.route";
+import { BackupRoutes } from "../modules/Backup/backup.route";
 
 const router = Router();
 
@@ -87,6 +88,10 @@ const moduleRoutes = [
   {
     path: "/search",
     route: SearchRoutes,
+  },
+  {
+    path: "/backups",
+    route: BackupRoutes,
   },
   // Upcoming modules:
   // { path: '/clients', route: ClientRoutes },

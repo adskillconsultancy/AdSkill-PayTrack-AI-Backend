@@ -2,6 +2,7 @@ import { Server } from "http";
 import app from "./app";
 import config from "./config";
 import prisma from "./lib/prisma";
+import { scheduleDailyMidnightBackup } from "./modules/Backup/backup.scheduler";
 
 let server: Server;
 
@@ -15,6 +16,9 @@ async function bootstrap() {
         `🩺 Health check available at http://localhost:${config.port}/api/v1/health`,
       );
     });
+
+    // Start automated midnight backup scheduler
+    scheduleDailyMidnightBackup();
   } catch (err) {
     console.error("Failed to start server:", err);
     process.exit(1);

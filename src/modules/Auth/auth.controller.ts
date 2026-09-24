@@ -8,7 +8,7 @@ import { AuthService } from "./auth.service";
 const cookieOptions = {
   secure: config.env === "production",
   httpOnly: true,
-  sameSite: "lax" as const,
+  sameSite: config.env === "production" ? ("none" as const) : ("lax" as const),
 };
 
 const register = catchAsync(async (req: Request, res: Response) => {

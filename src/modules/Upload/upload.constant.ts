@@ -5,5 +5,7 @@ export const UPLOAD_ALLOWED_MIME_TYPES = [
 ];
 
 export const UPLOAD_FOLDERS = {
-  DOCUMENTS: "Document",
+  DOCUMENTS: "adskill-paytrack/documents",
+  CASES: "adskill-paytrack/cases",
+  BACKUPS: "adskill-paytrack/backups",
 } as const;
