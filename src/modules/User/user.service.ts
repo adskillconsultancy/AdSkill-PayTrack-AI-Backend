@@ -15,7 +15,7 @@ import {
   calculatePagination,
   IPaginationOptions,
 } from "../../shared/paginationHelper";
-import { userSearchableFields, userSortableFields } from "./user.constant";
+import { userSearchableFields, userSortableFields, PERMISSIONS } from "./user.constant";
 import { AuditService } from "../Audit/audit.service";
 import {
   TCreateUserPayload,
@@ -84,6 +84,8 @@ const createUser = async (
   payload: TCreateUserPayload,
   actorId?: string,
   actorEmail?: string,
+  actorRole?: string,
+  actorPermissions: string[] = [],
 ) => {
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
@@ -115,6 +117,16 @@ const createUser = async (
         httpStatus.BAD_REQUEST,
         `Role "${roleToFind}" does not exist in the database`,
       );
+    }
+    if (role.name !== "CLIENT") {
+      const isSuperAdmin = actorRole === "SUPER_ADMIN";
+      const canManageRole = actorPermissions.includes(PERMISSIONS.USER_MANAGE_ROLE);
+      if (!isSuperAdmin && !canManageRole) {
+        throw new AppError(
+          httpStatus.FORBIDDEN,
+          "Only Super Administrator can assign employee/staff roles",
+        );
+      }
     }
     targetRoleId = role.id;
   } else {
@@ -381,6 +393,8 @@ const updateUser = async (
   payload: TUpdateUserPayload,
   actorId?: string,
   actorEmail?: string,
+  actorRole?: string,
+  actorPermissions: string[] = [],
 ) => {
   // Check if user exists and is not soft deleted (resolves actual UUID)
   const existingUser = await getUserById(idOrClientId);
@@ -388,20 +402,32 @@ const updateUser = async (
   const { roleName, password, ...rest } = payload;
   const updateData: Prisma.UserUpdateInput = { ...rest };
 
-  // Resolve roleName to roleId if supplied
-  if (roleName) {
-    const role = await prisma.userRole.findFirst({
-      where: { name: roleName, isDeleted: false },
-    });
-    if (!role) {
+  // PRIVILEGE ESCALATION SHIELD:
+  // Only Super Administrator or actors with user:manage-role can promote or modify roles
+  if (roleName || payload.roleId) {
+    const isSuperAdmin = actorRole === "SUPER_ADMIN";
+    const canManageRole = actorPermissions.includes(PERMISSIONS.USER_MANAGE_ROLE);
+    if (!isSuperAdmin && !canManageRole) {
       throw new AppError(
-        httpStatus.BAD_REQUEST,
-        `Role "${roleName}" does not exist`,
+        httpStatus.FORBIDDEN,
+        "Only Super Administrator can promote or change user roles",
       );
     }
-    updateData.role = { connect: { id: role.id } };
-  } else if (payload.roleId) {
-    updateData.role = { connect: { id: payload.roleId } };
+
+    if (roleName) {
+      const role = await prisma.userRole.findFirst({
+        where: { name: roleName, isDeleted: false },
+      });
+      if (!role) {
+        throw new AppError(
+          httpStatus.BAD_REQUEST,
+          `Role "${roleName}" does not exist`,
+        );
+      }
+      updateData.role = { connect: { id: role.id } };
+    } else if (payload.roleId) {
+      updateData.role = { connect: { id: payload.roleId } };
+    }
   }
 
   // If updating password, hash it first

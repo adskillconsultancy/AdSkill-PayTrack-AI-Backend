@@ -1,8 +1,21 @@
 import { Router } from "express";
 import auth from "../../middlewares/auth";
+import { PERMISSIONS } from "../User/user.constant";
 import { NotificationController } from "./notification.controller";
 
 const router = Router();
+
+// Reminders
+router.post(
+  "/reminders/process",
+  auth(PERMISSIONS.PAYMENT_READ),
+  NotificationController.processScheduledReminders,
+);
+router.post(
+  "/reminders/installment/:installmentId",
+  auth(PERMISSIONS.PAYMENT_READ),
+  NotificationController.sendManualReminder,
+);
 
 // All notification endpoints are scoped to the authenticated user
 router.get("/", auth(), NotificationController.getUserNotifications);

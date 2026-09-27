@@ -15,6 +15,7 @@ export type TRegisterPayload = {
 export type TLoginPayload = {
   email: string;
   password: string;
+  mfaCode?: string;
 };
 
 export type TAuthUserResponse = {
@@ -45,9 +46,11 @@ export type TAuthUserResponse = {
 };
 
 export type TAuthResponse = {
-  accessToken: string;
-  refreshToken: string;
-  user: TAuthUserResponse;
+  accessToken?: string;
+  refreshToken?: string;
+  user?: TAuthUserResponse;
+  mfaRequired?: boolean;
+  mfaToken?: string;
 };
 
 export type TRefreshTokenResponse = {
@@ -69,4 +72,27 @@ export type TUpdateProfilePayload = {
 export type TChangePasswordPayload = {
   currentPassword: string;
   newPassword: string;
+};
+
+export type TForgotPasswordPayload = {
+  email: string;
+};
+
+export type TResetPasswordPayload = {
+  token: string;
+  newPassword: string;
+};
+
+export type TVerifyMfaLoginPayload = {
+  mfaToken: string;
+  code: string;
+};
+
+export type TEnableMfaPayload = {
+  secret: string;
+  code: string;
+};
+
+export type TDisableMfaPayload = {
+  password: string;
 };

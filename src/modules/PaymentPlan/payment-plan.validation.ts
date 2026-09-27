@@ -4,7 +4,9 @@ const installmentSchema = z.object({
   sequenceNumber: z.number().int().min(1),
   title: z.string().trim().min(1).max(200).optional(),
   amount: z.number().positive().finite(),
-  dueDate: z.string().datetime({ offset: true }),
+  dueDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Invalid date format for dueDate",
+  }),
 });
 
 const createPaymentPlanValidationSchema = z.object({
@@ -22,6 +24,17 @@ const createPaymentPlanValidationSchema = z.object({
   }),
 });
 
+const updatePaymentPlanValidationSchema = z.object({
+  params: z.object({ id: z.string().uuid("Invalid payment plan ID") }),
+  body: z.object({
+    amendmentReason: z.string().trim().min(2, "Amendment reason is required").max(500),
+    paymentMethod: z.string().trim().min(2).max(50).optional(),
+    gracePeriodDays: z.number().int().min(0).max(365).optional(),
+    latePaymentPolicy: z.string().trim().max(1000).optional(),
+    isActive: z.boolean().optional(),
+  }),
+});
+
 const paymentPlanIdValidationSchema = z.object({
   params: z.object({ id: z.string().uuid("Invalid payment plan ID") }),
 });
@@ -32,6 +45,7 @@ const casePaymentPlansValidationSchema = z.object({
 
 export const PaymentPlanValidation = {
   createPaymentPlanValidationSchema,
+  updatePaymentPlanValidationSchema,
   paymentPlanIdValidationSchema,
   casePaymentPlansValidationSchema,
 };

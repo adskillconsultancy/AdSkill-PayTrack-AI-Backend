@@ -25,5 +25,11 @@ router.get(
   validateRequest(PaymentPlanValidation.paymentPlanIdValidationSchema),
   PaymentPlanController.getPaymentPlanById,
 );
+router.patch(
+  "/:id",
+  auth(PERMISSIONS.PLAN_UPDATE),
+  validateRequest(PaymentPlanValidation.updatePaymentPlanValidationSchema),
+  PaymentPlanController.updatePaymentPlan,
+);
 
 export const PaymentPlanRoutes = router;

@@ -97,6 +97,31 @@ const updateUserPreferences = catchAsync(async (req: Request, res: Response) => 
   });
 });
 
+const processScheduledReminders = catchAsync(async (req: Request, res: Response) => {
+  const result = await NotificationService.processScheduledReminders();
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Scheduled reminders processed successfully",
+    data: result,
+  });
+});
+
+const sendManualReminder = catchAsync(async (req: Request, res: Response) => {
+  const result = await NotificationService.sendManualReminder(
+    req.params.installmentId,
+    req.body?.customNote,
+    req.user?.id,
+    req.user?.email,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
 export const NotificationController = {
   getUserNotifications,
   getUnreadCount,
@@ -105,4 +130,6 @@ export const NotificationController = {
   deleteNotification,
   getUserPreferences,
   updateUserPreferences,
+  processScheduledReminders,
+  sendManualReminder,
 };

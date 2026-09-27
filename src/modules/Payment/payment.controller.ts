@@ -32,6 +32,16 @@ const verifyPayment = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payment verified successfully", data: result });
 });
 
+const refundPayment = catchAsync(async (req: Request, res: Response) => {
+  const result = await PaymentService.refundPayment(
+    req.params.id,
+    req.body,
+    req.user!.id,
+    req.user?.email,
+  );
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payment refunded successfully", data: result });
+});
+
 const getAllPayments = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentService.getAllPayments(
     req.query as any,
@@ -57,6 +67,6 @@ export const PaymentController = {
   listPayments,
   getPaymentById,
   verifyPayment,
+  refundPayment,
   getAllPayments,
 };
-

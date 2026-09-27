@@ -15,7 +15,6 @@ const register = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.register(req.body);
   const { refreshToken, accessToken, user } = result;
 
-  // Set refresh token in secure HTTP-only cookie
   res.cookie("refreshToken", refreshToken, cookieOptions);
 
   sendResponse(res, {
@@ -31,10 +30,24 @@ const register = catchAsync(async (req: Request, res: Response) => {
 
 const login = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.login(req.body);
-  const { refreshToken, accessToken, user } = result;
 
-  // Set refresh token in secure HTTP-only cookie
-  res.cookie("refreshToken", refreshToken, cookieOptions);
+  if (result.mfaRequired) {
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Multi-Factor Authentication code required",
+      data: {
+        mfaRequired: true,
+        mfaToken: result.mfaToken,
+      },
+    });
+    return;
+  }
+
+  const { refreshToken, accessToken, user } = result;
+  if (refreshToken) {
+    res.cookie("refreshToken", refreshToken, cookieOptions);
+  }
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -44,6 +57,83 @@ const login = catchAsync(async (req: Request, res: Response) => {
       accessToken,
       user,
     },
+  });
+});
+
+const verifyMfaLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.verifyMfaLogin(req.body);
+  const { refreshToken, accessToken, user } = result;
+
+  if (refreshToken) {
+    res.cookie("refreshToken", refreshToken, cookieOptions);
+  }
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "MFA verified, logged in successfully",
+    data: {
+      accessToken,
+      user,
+    },
+  });
+});
+
+const setupMfa = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const result = await AuthService.setupMfa(userId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "MFA setup key generated successfully",
+    data: result,
+  });
+});
+
+const enableMfa = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const result = await AuthService.enableMfa(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
+const disableMfa = catchAsync(async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const result = await AuthService.disableMfa(userId, req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
+const forgotPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.forgotPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
+const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.resetPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: result.message,
+    data: result,
   });
 });
 
@@ -98,6 +188,12 @@ const changePassword = catchAsync(async (req: Request, res: Response) => {
 export const AuthController = {
   register,
   login,
+  verifyMfaLogin,
+  setupMfa,
+  enableMfa,
+  disableMfa,
+  forgotPassword,
+  resetPassword,
   refreshToken,
   getMe,
   updateProfile,

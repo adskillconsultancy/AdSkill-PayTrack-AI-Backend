@@ -10,6 +10,8 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     req.body,
     req.user?.id,
     req.user?.email,
+    req.user?.role,
+    req.user?.effectivePermissions,
   );
 
   sendResponse(res, {
@@ -80,6 +82,8 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
     req.body,
     req.user?.id,
     req.user?.email,
+    req.user?.role,
+    req.user?.effectivePermissions,
   );
 
   sendResponse(res, {
@@ -119,23 +123,26 @@ const getUserPermissions = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const updateUserPermissions = catchAsync(async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const result = await UserService.updateUserDirectPermissions(
-    id,
-    req.body.permissionIds,
-    req.body.deniedPermissionIds,
-    req.user?.id,
-    req.user?.email,
-  );
+const updateUserPermissions = catchAsync(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { permissionIds, deniedPermissionIds } = req.body;
+    const result = await UserService.updateUserDirectPermissions(
+      id,
+      permissionIds,
+      deniedPermissionIds,
+      req.user?.id,
+      req.user?.email,
+    );
 
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "User direct permissions updated successfully",
-    data: result,
-  });
-});
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "User direct capability overrides updated successfully",
+      data: result,
+    });
+  },
+);
 
 export const UserController = {
   createUser,

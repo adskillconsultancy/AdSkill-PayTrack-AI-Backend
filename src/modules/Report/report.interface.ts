@@ -3,6 +3,7 @@ import { ServiceCategory } from "@prisma/client";
 export interface TReportFilterPayload {
   searchTerm?: string;
   category?: ServiceCategory | "ALL";
+  currency?: string;
   startDate?: string;
   endDate?: string;
   sortBy?: "paymentDate" | "verifiedAmount" | "contractedFee" | "clientName" | "programName";

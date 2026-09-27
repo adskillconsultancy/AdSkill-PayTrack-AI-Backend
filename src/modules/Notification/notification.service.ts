@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
 import { sendMail, wrapEmailLayout } from "../../lib/mail";
+import { AuditService } from "../Audit/audit.service";
 import {
   TCreateNotificationPayload,
   TNotificationFilters,
@@ -193,10 +194,6 @@ export const NotificationService = {
 
   /**
    * Trigger 1: Case Created Event
-   * - Client: Receives intake confirmation in-app + email
-   * - Super Admin: Receives new case notification in-app + email
-   * - Assigned Staff (if assigned & distinct from creator): Receives assignment in-app + email
-   * - Other Staff / Consultants: EXCLUDED COMPLETELY (Strict Isolation)
    */
   async dispatchCaseCreatedNotification(params: {
     caseId: string;
@@ -264,7 +261,7 @@ export const NotificationService = {
       metadata: { caseCode, clientId },
     }).catch((err) => console.error("Error sending client case email:", err));
 
-    // 2. Fetch all Super Admins (Super Admin gets all notifications)
+    // 2. Fetch all Super Admins
     const superAdmins = await prisma.user.findMany({
       where: {
         role: { name: "SUPER_ADMIN" },
@@ -310,7 +307,7 @@ export const NotificationService = {
       }).catch((err) => console.error("Error sending admin email:", err));
     }
 
-    // 3. Notify Assigned Consultant (if assigned and not the creator)
+    // 3. Notify Assigned Consultant
     if (assignedConsultantId && assignedConsultantId !== creatorId) {
       const consultant = await prisma.user.findUnique({
         where: { id: assignedConsultantId },
@@ -356,11 +353,7 @@ export const NotificationService = {
   },
 
   /**
-   * Trigger 2: Payment Recorded / Submitted (Pending Verification)
-   * - Client: Receives payment submission confirmation
-   * - Super Admin: Receives pending verification alert
-   * - Assigned Staff: Receives alert for their assigned case
-   * - Other Staff: EXCLUDED COMPLETELY
+   * Trigger 2: Payment Recorded / Submitted
    */
   async dispatchPaymentRecordedNotification(params: {
     paymentId: string;
@@ -443,7 +436,7 @@ export const NotificationService = {
       });
     }
 
-    // 3. Notify Assigned Consultant (if any)
+    // 3. Notify Assigned Consultant
     if (assignedConsultantId) {
       await this.createNotification({
         userId: assignedConsultantId,
@@ -460,10 +453,6 @@ export const NotificationService = {
 
   /**
    * Trigger 3: Payment Verified & Official Receipt Issued
-   * - Client: Receives verified confirmation + receipt link/email
-   * - Super Admin: Receives verification notice
-   * - Assigned Staff: Receives in-app update
-   * - Other Staff: EXCLUDED COMPLETELY
    */
   async dispatchPaymentVerifiedNotification(params: {
     paymentId: string;
@@ -548,7 +537,7 @@ export const NotificationService = {
       });
     }
 
-    // 3. Notify Assigned Consultant (if any)
+    // 3. Notify Assigned Consultant
     if (assignedConsultantId) {
       await this.createNotification({
         userId: assignedConsultantId,
@@ -561,5 +550,267 @@ export const NotificationService = {
         actionUrl: `/invoices-receipts`,
       });
     }
+  },
+
+  // =========================================================================
+  // AUTOMATED SCHEDULED REMINDERS & MANUAL DISPATCH
+  // =========================================================================
+
+  /**
+   * Process all upcoming and overdue installment milestones
+   * Checks for 7 days before, 3 days before, due today, 3 days overdue, 7 days overdue, 14 days overdue
+   */
+  async processScheduledReminders() {
+    const activeInstallments = await prisma.installment.findMany({
+      where: {
+        isDeleted: false,
+        status: { in: ["PENDING", "PARTIALLY_PAID"] },
+        paymentPlan: {
+          isDeleted: false,
+          isActive: true,
+          case: {
+            isDeleted: false,
+          },
+        },
+      },
+      include: {
+        paymentPlan: {
+          select: {
+            currency: true,
+            gracePeriodDays: true,
+            case: {
+              select: {
+                id: true,
+                caseCode: true,
+                userId: true,
+                assignedConsultantId: true,
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    let remindersDispatched = 0;
+
+    for (const inst of activeInstallments) {
+      const dueDate = new Date(inst.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+
+      const diffTime = dueDate.getTime() - now.getTime();
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+      const client = inst.paymentPlan.case.user;
+      const caseCode = inst.paymentPlan.case.caseCode;
+      const currency = inst.paymentPlan.currency;
+      const formattedAmount = `${currency} ${Number(inst.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+
+      let reminderTitle = "";
+      let reminderMessage = "";
+      let isUrgent = false;
+
+      if (diffDays === 7) {
+        reminderTitle = `Upcoming Payment: 7 Days Notice`;
+        reminderMessage = `Your installment #${inst.sequenceNumber} (${formattedAmount}) for case ${caseCode} is due in 7 days on ${dueDate.toLocaleDateString()}.`;
+      } else if (diffDays === 3) {
+        reminderTitle = `Upcoming Payment: 3 Days Notice`;
+        reminderMessage = `Your installment #${inst.sequenceNumber} (${formattedAmount}) for case ${caseCode} is due in 3 days on ${dueDate.toLocaleDateString()}.`;
+      } else if (diffDays === 0) {
+        reminderTitle = `Payment Due Today`;
+        reminderMessage = `Your installment #${inst.sequenceNumber} (${formattedAmount}) for case ${caseCode} is due today. Please complete your transfer to avoid delays.`;
+        isUrgent = true;
+      } else if (diffDays === -3) {
+        reminderTitle = `Overdue Notice: 3 Days Past Due`;
+        reminderMessage = `Your installment #${inst.sequenceNumber} (${formattedAmount}) for case ${caseCode} was due on ${dueDate.toLocaleDateString()} and is now 3 days overdue.`;
+        isUrgent = true;
+      } else if (diffDays === -7) {
+        reminderTitle = `Urgent: 7 Days Overdue (Grace Period)`;
+        reminderMessage = `Your installment #${inst.sequenceNumber} (${formattedAmount}) for case ${caseCode} is 7 days overdue. Case processing may be paused if not settled immediately.`;
+        isUrgent = true;
+      } else if (diffDays === -14) {
+        reminderTitle = `Final Notice: 14 Days Overdue`;
+        reminderMessage = `URGENT: Installment #${inst.sequenceNumber} (${formattedAmount}) for case ${caseCode} is 14 days overdue. Immediate payment is required.`;
+        isUrgent = true;
+      }
+
+      if (reminderTitle && client) {
+        // Dispatch in-app notification to client
+        await this.createNotification({
+          userId: client.id,
+          title: reminderTitle,
+          message: reminderMessage,
+          type: NotificationType.REMINDER,
+          priority: isUrgent ? NotificationPriority.URGENT : NotificationPriority.NORMAL,
+          entityType: "INSTALLMENT",
+          entityId: inst.id,
+          actionUrl: `/payments`,
+        });
+
+        // Send email
+        const emailHtml = wrapEmailLayout(
+          reminderTitle,
+          `
+          <div class="badge ${isUrgent ? "badge-danger" : "badge-warning"}">${reminderTitle}</div>
+          <h1 class="h1">Hello ${client.name},</h1>
+          <p>${reminderMessage}</p>
+          <div class="card-detail">
+            <div class="detail-row"><span class="detail-label">Case Reference:</span><span class="detail-value">${caseCode}</span></div>
+            <div class="detail-row"><span class="detail-label">Installment:</span><span class="detail-value">#${inst.sequenceNumber} - ${inst.title || "Milestone Payment"}</span></div>
+            <div class="detail-row"><span class="detail-label">Amount Due:</span><span class="detail-value" style="font-weight: bold; color: ${isUrgent ? '#dc2626' : '#0a0a0a'}">${formattedAmount}</span></div>
+            <div class="detail-row"><span class="detail-label">Due Date:</span><span class="detail-value">${dueDate.toLocaleDateString()}</span></div>
+          </div>
+          <p>Please log in to your portal to review payment instructions and submit your receipt.</p>
+          <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/payments" class="btn">Pay Now & View Portal</a>
+          `
+        );
+
+        sendMail({
+          to: client.email,
+          subject: `[${reminderTitle}] Case ${caseCode} - ${formattedAmount}`,
+          html: emailHtml,
+          templateName: "SCHEDULED_PAYMENT_REMINDER",
+          metadata: { caseCode, installmentId: inst.id, diffDays },
+        }).catch((err) => console.error("Error sending scheduled reminder email:", err));
+
+        // If overdue, also alert assigned consultant
+        if (diffDays < 0 && inst.paymentPlan.case.assignedConsultantId) {
+          await this.createNotification({
+            userId: inst.paymentPlan.case.assignedConsultantId,
+            title: `Client Overdue: Case ${caseCode}`,
+            message: `${client.name} has an overdue installment of ${formattedAmount} (Due: ${dueDate.toLocaleDateString()}).`,
+            type: NotificationType.REMINDER,
+            priority: NotificationPriority.HIGH,
+            entityType: "INSTALLMENT",
+            entityId: inst.id,
+            actionUrl: `/clients/${client.id}`,
+          });
+        }
+
+        remindersDispatched++;
+      }
+    }
+
+    return {
+      totalInstallmentsEvaluated: activeInstallments.length,
+      remindersDispatched,
+      processedAt: new Date().toISOString(),
+    };
+  },
+
+  /**
+   * Manually trigger a reminder for a specific installment to the client
+   */
+  async sendManualReminder(
+    installmentId: string,
+    customNote?: string,
+    actorId?: string,
+    actorEmail?: string,
+  ) {
+    const inst = await prisma.installment.findFirst({
+      where: { id: installmentId, isDeleted: false },
+      include: {
+        paymentPlan: {
+          select: {
+            currency: true,
+            case: {
+              select: {
+                id: true,
+                caseCode: true,
+                userId: true,
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!inst) throw new AppError(httpStatus.NOT_FOUND, "Installment not found");
+    if (inst.status === "PAID") throw new AppError(httpStatus.BAD_REQUEST, "Installment is already fully paid");
+
+    const client = inst.paymentPlan.case.user;
+    if (!client) throw new AppError(httpStatus.NOT_FOUND, "Client account not found for installment");
+
+    const formattedAmount = `${inst.paymentPlan.currency} ${Number(inst.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    const dueDate = new Date(inst.dueDate).toLocaleDateString();
+
+    const title = `Payment Reminder: Case ${inst.paymentPlan.case.caseCode}`;
+    const message = customNote || `A payment of ${formattedAmount} for installment #${inst.sequenceNumber} is due on ${dueDate}.`;
+
+    // 1. In-app notification
+    await this.createNotification({
+      userId: client.id,
+      title,
+      message,
+      type: NotificationType.REMINDER,
+      priority: NotificationPriority.HIGH,
+      entityType: "INSTALLMENT",
+      entityId: inst.id,
+      actionUrl: `/payments`,
+    });
+
+    // 2. Email
+    const emailHtml = wrapEmailLayout(
+      title,
+      `
+      <div class="badge badge-warning">Payment Reminder</div>
+      <h1 class="h1">Hello ${client.name},</h1>
+      <p>This is a reminder regarding your upcoming payment for case <strong>${inst.paymentPlan.case.caseCode}</strong>.</p>
+      <div class="card-detail">
+        <div class="detail-row"><span class="detail-label">Milestone:</span><span class="detail-value">#${inst.sequenceNumber} - ${inst.title || "Installment"}</span></div>
+        <div class="detail-row"><span class="detail-label">Amount:</span><span class="detail-value font-bold">${formattedAmount}</span></div>
+        <div class="detail-row"><span class="detail-label">Due Date:</span><span class="detail-value">${dueDate}</span></div>
+        ${customNote ? `<div class="detail-row"><span class="detail-label">Staff Note:</span><span class="detail-value">${customNote}</span></div>` : ""}
+      </div>
+      <p>Please log in to your portal to review payment options or upload payment proof.</p>
+      <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/payments" class="btn">View Payment Portal</a>
+      `
+    );
+
+    sendMail({
+      to: client.email,
+      subject: `Payment Reminder [${inst.paymentPlan.case.caseCode}]: ${formattedAmount}`,
+      html: emailHtml,
+      templateName: "MANUAL_PAYMENT_REMINDER",
+      metadata: { installmentId: inst.id, caseCode: inst.paymentPlan.case.caseCode },
+    }).catch((err) => console.error("Error sending manual reminder email:", err));
+
+    if (actorId) {
+      AuditService.writeAuditLog({
+        actorId,
+        actorEmail,
+        action: "SEND_MANUAL_PAYMENT_REMINDER",
+        targetEntity: "Installment",
+        targetId: installmentId,
+        afterValue: {
+          clientEmail: client.email,
+          amount: formattedAmount,
+          customNote,
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: `Reminder sent to ${client.email}`,
+      clientEmail: client.email,
+      installmentId,
+    };
   },
 };

@@ -15,6 +15,7 @@ const generateReport = async (
   const {
     searchTerm,
     category,
+    currency,
     startDate,
     endDate,
     sortBy = "paymentDate",
@@ -28,6 +29,11 @@ const generateReport = async (
     isDeleted: false,
     status: { in: ["VERIFIED", "COMPLETED", "PAID"] },
   };
+
+  // Filter by currency if provided
+  if (currency && currency.trim() && currency !== "ALL") {
+    where.currency = currency.trim().toUpperCase();
+  }
 
   // Filter by service program category
   if (category && category !== "ALL") {
@@ -86,38 +92,42 @@ const generateReport = async (
     ];
   }
 
-  // 1. Calculate Executive KPIs across all verified income and contracted fees
+  // 1. Calculate Executive KPIs across verified income and contracted fees using exact Prisma.Decimal
   const [allVerifiedPayments, allActivePlans] = await Promise.all([
     prisma.payment.findMany({
       where: {
         isDeleted: false,
         status: { in: ["VERIFIED", "COMPLETED", "PAID"] },
+        ...(currency && currency !== "ALL" ? { currency: currency.trim().toUpperCase() } : {}),
       },
       select: { amount: true },
     }),
     prisma.paymentPlan.findMany({
-      where: { isDeleted: false, isActive: true },
+      where: {
+        isDeleted: false,
+        isActive: true,
+        ...(currency && currency !== "ALL" ? { currency: currency.trim().toUpperCase() } : {}),
+      },
       select: { contractedFee: true },
     }),
   ]);
 
-  const totalVerifiedIncome = allVerifiedPayments.reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0,
+  const totalVerifiedIncomeDec = allVerifiedPayments.reduce(
+    (sum, p) => sum.plus(new Prisma.Decimal(p.amount)),
+    new Prisma.Decimal(0),
   );
-  const totalContractedFees = allActivePlans.reduce(
-    (sum, plan) => sum + Number(plan.contractedFee || 0),
-    0,
+  const totalContractedFeesDec = allActivePlans.reduce(
+    (sum, plan) => sum.plus(new Prisma.Decimal(plan.contractedFee)),
+    new Prisma.Decimal(0),
   );
-  const totalOutstandingReceivables = Math.max(
-    0,
-    totalContractedFees - totalVerifiedIncome,
-  );
+  const totalOutstandingReceivablesDec = totalContractedFeesDec.gt(totalVerifiedIncomeDec)
+    ? totalContractedFeesDec.minus(totalVerifiedIncomeDec)
+    : new Prisma.Decimal(0);
 
   const kpis: TReportKPIs = {
-    totalVerifiedIncome,
-    totalContractedFees,
-    totalOutstandingReceivables,
+    totalVerifiedIncome: totalVerifiedIncomeDec.toNumber(),
+    totalContractedFees: totalContractedFeesDec.toNumber(),
+    totalOutstandingReceivables: totalOutstandingReceivablesDec.toNumber(),
     verifiedCollectionsCount: allVerifiedPayments.length,
   };
 

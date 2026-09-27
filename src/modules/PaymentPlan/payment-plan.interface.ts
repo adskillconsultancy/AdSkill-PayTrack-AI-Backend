@@ -17,6 +17,14 @@ export type TCreatePaymentPlanPayload = {
   }>;
 };
 
+export type TUpdatePaymentPlanPayload = {
+  amendmentReason: string;
+  paymentMethod?: string;
+  gracePeriodDays?: number;
+  latePaymentPolicy?: string;
+  isActive?: boolean;
+};
+
 export type TPaymentPlanWithInstallments = Prisma.PaymentPlanGetPayload<{
   include: { installments: true };
 }>;

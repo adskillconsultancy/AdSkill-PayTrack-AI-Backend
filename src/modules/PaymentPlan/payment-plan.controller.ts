@@ -22,6 +22,22 @@ const createPaymentPlan = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updatePaymentPlan = catchAsync(async (req: Request, res: Response) => {
+  const result = await PaymentPlanService.updatePaymentPlan(
+    req.params.id,
+    req.body,
+    req.user!.id,
+    req.user?.role,
+    req.user?.email,
+  );
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Payment plan amended successfully",
+    data: result,
+  });
+});
+
 const getCasePaymentPlans = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentPlanService.getPaymentPlansForCase(
     req.params.caseId,
@@ -54,6 +70,7 @@ const getPaymentPlanById = catchAsync(async (req: Request, res: Response) => {
 
 export const PaymentPlanController = {
   createPaymentPlan,
+  updatePaymentPlan,
   getCasePaymentPlans,
   getPaymentPlanById,
 };

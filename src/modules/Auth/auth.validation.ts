@@ -36,6 +36,7 @@ const loginValidationSchema = z.object({
     password: z.string({
       required_error: "Password is required",
     }),
+    mfaCode: z.string().optional(),
   }),
 });
 
@@ -79,10 +80,72 @@ const changePasswordValidationSchema = z.object({
   }),
 });
 
+const forgotPasswordValidationSchema = z.object({
+  body: z.object({
+    email: z
+      .string({
+        required_error: "Email address is required",
+      })
+      .email("Invalid email address format"),
+  }),
+});
+
+const resetPasswordValidationSchema = z.object({
+  body: z.object({
+    token: z.string({
+      required_error: "Reset token is required",
+    }),
+    newPassword: z
+      .string({
+        required_error: "New password is required",
+      })
+      .min(6, "New password must be at least 6 characters long"),
+  }),
+});
+
+const verifyMfaLoginValidationSchema = z.object({
+  body: z.object({
+    mfaToken: z.string({
+      required_error: "MFA session token is required",
+    }),
+    code: z
+      .string({
+        required_error: "MFA 6-digit verification code is required",
+      })
+      .length(6, "MFA code must be exactly 6 digits"),
+  }),
+});
+
+const enableMfaValidationSchema = z.object({
+  body: z.object({
+    secret: z.string({
+      required_error: "MFA secret is required",
+    }),
+    code: z
+      .string({
+        required_error: "MFA 6-digit code is required",
+      })
+      .length(6, "MFA code must be exactly 6 digits"),
+  }),
+});
+
+const disableMfaValidationSchema = z.object({
+  body: z.object({
+    password: z.string({
+      required_error: "Current password is required to disable MFA",
+    }),
+  }),
+});
+
 export const AuthValidation = {
   registerValidationSchema,
   loginValidationSchema,
   refreshTokenValidationSchema,
   updateProfileValidationSchema,
   changePasswordValidationSchema,
+  forgotPasswordValidationSchema,
+  resetPasswordValidationSchema,
+  verifyMfaLoginValidationSchema,
+  enableMfaValidationSchema,
+  disableMfaValidationSchema,
 };

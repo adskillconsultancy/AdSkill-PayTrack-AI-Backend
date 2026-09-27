@@ -3,7 +3,7 @@ import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
 import { AuditService } from "../Audit/audit.service";
-import { TCreatePaymentPlanPayload } from "./payment-plan.interface";
+import { TCreatePaymentPlanPayload, TUpdatePaymentPlanPayload } from "./payment-plan.interface";
 
 const planInclude = {
   installments: { where: { isDeleted: false }, orderBy: { sequenceNumber: "asc" as const } },
@@ -66,8 +66,8 @@ const createPaymentPlan = async (
     (sum, item) => sum.plus(new Prisma.Decimal(item.amount)),
     new Prisma.Decimal(0),
   );
-  if (!installmentTotal.eq(contractedFee)) {
-    throw new AppError(httpStatus.BAD_REQUEST, "Installments must equal contracted fee");
+  if (!installmentTotal.eq(contractedFee) && !installmentTotal.plus(deposit).eq(contractedFee)) {
+    throw new AppError(httpStatus.BAD_REQUEST, "Installments must equal contracted fee or remaining balance after deposit");
   }
 
   const plan = await prisma.$transaction(
@@ -122,6 +122,55 @@ const createPaymentPlan = async (
   return plan;
 };
 
+const updatePaymentPlan = async (
+  id: string,
+  payload: TUpdatePaymentPlanPayload,
+  actorId: string,
+  userRole?: string,
+  actorEmail?: string,
+) => {
+  const existingPlan = await prisma.paymentPlan.findFirst({
+    where: { id, isDeleted: false },
+    include: planInclude,
+  });
+  if (!existingPlan) throw new AppError(httpStatus.NOT_FOUND, "Payment plan not found");
+  await ensureCaseAccess(existingPlan.caseId, actorId, true, userRole);
+
+  const updatedPlan = await prisma.paymentPlan.update({
+    where: { id },
+    data: {
+      paymentMethod: payload.paymentMethod !== undefined ? payload.paymentMethod : existingPlan.paymentMethod,
+      gracePeriodDays: payload.gracePeriodDays !== undefined ? payload.gracePeriodDays : existingPlan.gracePeriodDays,
+      latePaymentPolicy: payload.latePaymentPolicy !== undefined ? payload.latePaymentPolicy : existingPlan.latePaymentPolicy,
+      isActive: payload.isActive !== undefined ? payload.isActive : existingPlan.isActive,
+    },
+    include: planInclude,
+  });
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "UPDATE_PAYMENT_PLAN",
+    targetEntity: "PaymentPlan",
+    targetId: id,
+    beforeValue: {
+      paymentMethod: existingPlan.paymentMethod,
+      gracePeriodDays: existingPlan.gracePeriodDays,
+      latePaymentPolicy: existingPlan.latePaymentPolicy,
+      isActive: existingPlan.isActive,
+    },
+    afterValue: {
+      paymentMethod: updatedPlan.paymentMethod,
+      gracePeriodDays: updatedPlan.gracePeriodDays,
+      latePaymentPolicy: updatedPlan.latePaymentPolicy,
+      isActive: updatedPlan.isActive,
+      amendmentReason: payload.amendmentReason,
+    },
+  });
+
+  return updatedPlan;
+};
+
 const getPaymentPlanById = async (id: string, actorId: string, staff: boolean, userRole?: string) => {
   const plan = await prisma.paymentPlan.findFirst({
     where: { id, isDeleted: false },
@@ -139,6 +188,7 @@ const getPaymentPlanById = async (id: string, actorId: string, staff: boolean, u
 
 export const PaymentPlanService = {
   createPaymentPlan,
+  updatePaymentPlan,
   getPaymentPlansForCase,
   getPaymentPlanById,
 };

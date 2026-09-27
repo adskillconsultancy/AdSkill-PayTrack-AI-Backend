@@ -155,14 +155,7 @@ const createPayment = async (
       select: { id: true, amount: true },
     });
     if (!installment) throw new AppError(httpStatus.BAD_REQUEST, "Installment does not belong to case");
-    const alreadyPaid = await prisma.payment.aggregate({
-      where: { installmentId: payload.installmentId, isDeleted: false, status: "VERIFIED" },
-      _sum: { amount: true },
-    });
-    const remaining = installment.amount.sub(alreadyPaid._sum.amount ?? new Prisma.Decimal(0));
-    if (amount.gt(remaining)) {
-      throw new AppError(httpStatus.BAD_REQUEST, `Payment cannot exceed remaining installment balance (${remaining})`);
-    }
+    // Overpayment is supported: surplus counts towards the client case balance
   }
 
   const payment = await prisma.$transaction(
@@ -306,6 +299,75 @@ const verifyPayment = async (id: string, actorId: string, actorEmail?: string) =
     verifierName: updated.verifiedBy?.name || "AdSkill Finance",
     assignedConsultantId: updated.case.assignedConsultantId,
   }).catch((err) => console.error("[NOTIFICATION_ERROR] dispatchPaymentVerifiedNotification:", err));
+
+  return updated;
+};
+
+const refundPayment = async (
+  id: string,
+  payload: { reason: string; refundAmount?: number },
+  actorId: string,
+  actorEmail?: string,
+) => {
+  const updated = await prisma.$transaction(
+    async (tx) => {
+      const payment = await tx.payment.findFirst({
+        where: { id, isDeleted: false },
+        include: paymentInclude,
+      });
+      if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
+      if (payment.status !== "VERIFIED" && payment.status !== "PARTIALLY_REFUNDED") {
+        throw new AppError(httpStatus.BAD_REQUEST, "Only verified payments can be refunded");
+      }
+
+      const refundDec = payload.refundAmount ? new Prisma.Decimal(payload.refundAmount) : payment.amount;
+      if (refundDec.lte(0)) {
+        throw new AppError(httpStatus.BAD_REQUEST, "Refund amount must be greater than zero");
+      }
+      if (refundDec.gt(payment.amount)) {
+        throw new AppError(httpStatus.BAD_REQUEST, "Refund amount cannot exceed payment amount");
+      }
+
+      const isFullRefund = refundDec.eq(payment.amount);
+      const newStatus = isFullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED";
+
+      const updatedRecord = await tx.payment.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          operationalNotes: payment.operationalNotes
+            ? `${payment.operationalNotes} | Refund of ${refundDec.toString()} ${payment.currency} processed: ${payload.reason}`
+            : `Refund of ${refundDec.toString()} ${payment.currency} processed: ${payload.reason}`,
+        },
+        include: paymentInclude,
+      });
+
+      if (payment.installmentId) {
+        await refreshInstallmentStatus(tx, payment.installmentId);
+      }
+      await refreshFinancialStatus(tx, payment.caseId);
+      return updatedRecord;
+    },
+    {
+      maxWait: 10000,
+      timeout: 25000,
+    },
+  );
+
+  AuditService.writeAuditLog({
+    actorId,
+    actorEmail,
+    action: "REFUND_PAYMENT",
+    targetEntity: "Payment",
+    targetId: updated.id,
+    beforeValue: { status: "VERIFIED" },
+    afterValue: {
+      status: updated.status,
+      refundReason: payload.reason,
+      refundAmount: payload.refundAmount ?? updated.amount.toString(),
+      currency: updated.currency,
+    },
+  });
 
   return updated;
 };
@@ -460,6 +522,7 @@ export const PaymentService = {
   createPayment,
   listPayments,
   verifyPayment,
+  refundPayment,
   getPaymentById,
   getAllPayments,
 };

@@ -36,5 +36,11 @@ router.post(
   validateRequest(PaymentValidation.paymentIdValidationSchema),
   PaymentController.verifyPayment,
 );
+router.post(
+  "/:id/refund",
+  auth(PERMISSIONS.PAYMENT_REFUND),
+  validateRequest(PaymentValidation.refundPaymentValidationSchema),
+  PaymentController.refundPayment,
+);
 
 export const PaymentRoutes = router;
