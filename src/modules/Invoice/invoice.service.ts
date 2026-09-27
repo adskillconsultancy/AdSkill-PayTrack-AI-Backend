@@ -159,6 +159,33 @@ const listInvoices = async (caseId: string, actorId: string, staff: boolean, use
   return prisma.invoice.findMany({ where: { caseId, isDeleted: false }, include, orderBy: { issuedAt: "desc" } });
 };
 
+const getAllInvoices = async (
+  query: { caseId?: string },
+  actorId: string,
+  staff: boolean,
+  userRole?: string,
+) => {
+  const andConditions: Prisma.InvoiceWhereInput[] = [{ isDeleted: false }];
+
+  if (query.caseId) {
+    await access(query.caseId, actorId, staff, userRole);
+    andConditions.push({ caseId: query.caseId });
+  } else {
+    if (!staff) {
+      andConditions.push({ case: { userId: actorId } });
+    }
+    if (userRole === "CONSULTANT") {
+      andConditions.push({ case: { assignedConsultantId: actorId } });
+    }
+  }
+
+  return prisma.invoice.findMany({
+    where: { AND: andConditions },
+    include,
+    orderBy: { issuedAt: "desc" },
+  });
+};
+
 // ─── Get Single Invoice ───────────────────────────────────────────────────────
 const getInvoice = async (id: string, actorId: string, staff: boolean, userRole?: string) => {
   const item = await prisma.invoice.findFirst({ where: { id, isDeleted: false }, include });
@@ -324,4 +351,4 @@ const generateInvoicePdf = async (id: string, actorId: string, staff: boolean, u
   return streamToBuffer(doc);
 };
 
-export const InvoiceService = { generateInvoice, listInvoices, getInvoice, generateInvoicePdf };
+export const InvoiceService = { generateInvoice, listInvoices, getAllInvoices, getInvoice, generateInvoicePdf };

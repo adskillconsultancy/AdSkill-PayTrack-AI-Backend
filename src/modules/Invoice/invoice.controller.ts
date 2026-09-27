@@ -38,4 +38,10 @@ const downloadInvoicePdf = catchAsync(async (req: Request, res: Response) => {
   res.send(pdfBuffer);
 });
 
-export const InvoiceController = { generateInvoice, listInvoices, getInvoice, downloadInvoicePdf };
+const getAllInvoices = catchAsync(async (req: Request, res: Response) => {
+  const caseId = (req.query.caseId || req.query.clientCaseId) as string | undefined;
+  const data = await InvoiceService.getAllInvoices({ caseId }, req.user!.id, staff(req), req.user?.role);
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Invoices retrieved successfully", data });
+});
+
+export const InvoiceController = { generateInvoice, listInvoices, getAllInvoices, getInvoice, downloadInvoicePdf };

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { Request, Response } from "express";
 import httpStatus from "http-status";
 import catchAsync from "../../shared/catchAsync";
@@ -6,14 +7,30 @@ import { runDatabaseBackup } from "./backup.service";
 
 export const triggerBackupController = catchAsync(
   async (req: Request, res: Response) => {
-    // Check for optional CRON_SECRET or staff/super-admin role if authenticated
     const cronSecret = process.env.CRON_SECRET;
-    const providedSecret = req.headers["x-cron-secret"] || req.query.secret;
+    const providedSecret = (req.headers["x-cron-secret"] as string) || (req.query.secret as string);
 
-    if (cronSecret && providedSecret !== cronSecret && process.env.NODE_ENV === "production") {
+    let isAuthorized = false;
+
+    // 1. Verify against valid non-empty CRON_SECRET if configured
+    if (cronSecret && cronSecret.length >= 8 && providedSecret) {
+      if (cronSecret.length === providedSecret.length) {
+        isAuthorized = crypto.timingSafeEqual(
+          Buffer.from(cronSecret),
+          Buffer.from(providedSecret),
+        );
+      }
+    }
+
+    // 2. Or allow authenticated Super Admin session
+    if (!isAuthorized && req.user && req.user.role === "SUPER_ADMIN") {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
       res.status(httpStatus.UNAUTHORIZED).json({
         success: false,
-        message: "Unauthorized: Invalid cron secret",
+        message: "Unauthorized: Valid cron secret or Super Admin authentication required",
       });
       return;
     }

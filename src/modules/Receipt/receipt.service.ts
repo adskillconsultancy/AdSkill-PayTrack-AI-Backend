@@ -178,6 +178,40 @@ const listReceipts = async (caseId: string, actorId: string, staff: boolean, use
   return prisma.receipt.findMany({ where: { caseId, isDeleted: false }, include, orderBy: { issuedAt: "desc" } });
 };
 
+const getAllReceipts = async (
+  query: { caseId?: string },
+  actorId: string,
+  staff: boolean,
+  userRole?: string,
+) => {
+  const andConditions: Prisma.ReceiptWhereInput[] = [{ isDeleted: false }];
+
+  if (query.caseId) {
+    const item = await prisma.clientCase.findFirst({
+      where: { id: query.caseId, isDeleted: false },
+      select: { userId: true, assignedConsultantId: true },
+    });
+    if (!item) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
+    if (!staff && item.userId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You cannot access this case");
+    if (userRole === "CONSULTANT" && item.assignedConsultantId !== actorId)
+      throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this case");
+    andConditions.push({ caseId: query.caseId });
+  } else {
+    if (!staff) {
+      andConditions.push({ case: { userId: actorId } });
+    }
+    if (userRole === "CONSULTANT") {
+      andConditions.push({ case: { assignedConsultantId: actorId } });
+    }
+  }
+
+  return prisma.receipt.findMany({
+    where: { AND: andConditions },
+    include,
+    orderBy: { issuedAt: "desc" },
+  });
+};
+
 // ─── Get Single Receipt ───────────────────────────────────────────────────────
 const getReceipt = async (id: string, actorId: string, staff: boolean, userRole?: string) => {
   const item = await prisma.receipt.findFirst({ where: { id, isDeleted: false }, include });
@@ -301,4 +335,4 @@ const generateReceiptPdf = async (id: string, actorId: string, staff: boolean, u
   return streamToBuffer(doc);
 };
 
-export const ReceiptService = { createReceipt, listReceipts, getReceipt, generateReceiptPdf };
+export const ReceiptService = { createReceipt, listReceipts, getAllReceipts, getReceipt, generateReceiptPdf };

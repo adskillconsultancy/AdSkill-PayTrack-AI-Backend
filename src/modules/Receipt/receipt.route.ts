@@ -7,6 +7,11 @@ import { ReceiptValidation } from "./receipt.validation";
 
 const router = Router();
 
+router.get(
+  "/",
+  auth(PERMISSIONS.RECEIPT_READ),
+  ReceiptController.getAllReceipts
+);
 router.post(
   "/payments/:paymentId",
   auth(PERMISSIONS.RECEIPT_GENERATE),

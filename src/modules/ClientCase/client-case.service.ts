@@ -155,7 +155,7 @@ const createClientCase = async (
       serviceStartDate: payload.serviceStartDate ? new Date(payload.serviceStartDate) : undefined,
       clientVisibleNotes: payload.clientVisibleNotes,
       internalNotes: payload.internalNotes,
-      superAdminNotes: payload.superAdminNotes,
+      superAdminNotes: userRole === "SUPER_ADMIN" ? payload.superAdminNotes : undefined,
     },
     select: caseSelect,
   });

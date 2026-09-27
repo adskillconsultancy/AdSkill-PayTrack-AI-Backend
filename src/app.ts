@@ -24,15 +24,21 @@ const corsOptions: cors.CorsOptions = {
     // Allow requests with no origin (e.g. mobile apps, curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
 
+    // Only allow explicit configured client URLs or exact AdSkill PayTrack Vercel deployments
+    const isExplicitAllowed = allowedOrigins.includes(origin);
+    const isProjectVercelDeploy =
+      origin === "https://ad-skill-pay-track-ai-frontend.vercel.app" ||
+      /^https:\/\/ad-skill-pay-track-ai-frontend-[a-z0-9-]+-adskill.*\.vercel\.app$/.test(origin);
+
     if (
-      allowedOrigins.includes(origin) ||
-      origin.endsWith(".vercel.app") ||
+      isExplicitAllowed ||
+      isProjectVercelDeploy ||
       process.env.NODE_ENV !== "production"
     ) {
       return callback(null, true);
     }
 
-    return callback(null, false);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

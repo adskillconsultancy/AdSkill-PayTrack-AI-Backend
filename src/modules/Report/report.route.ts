@@ -19,4 +19,14 @@ router.post(
   ReportController.generateReport,
 );
 
+/**
+ * GET /api/v1/reports
+ * Returns executive overview report
+ */
+router.get(
+  "/",
+  auth(PERMISSIONS.REPORT_VIEW),
+  ReportController.getReportOverview,
+);
+
 export const ReportRoutes = router;

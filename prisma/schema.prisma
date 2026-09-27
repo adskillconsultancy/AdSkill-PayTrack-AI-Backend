@@ -133,6 +133,7 @@ model RolePermission {
   updatedAt    DateTime   @updatedAt
 
   @@unique([roleId, permissionId])
+  @@index([permissionId])
   @@map("role_permissions")
 }
 
@@ -191,6 +192,8 @@ model User {
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
+  @@index([roleId])
+  @@index([status, isDeleted])
   @@map("users")
 }
 
@@ -211,6 +214,7 @@ model UserPermission {
   updatedAt    DateTime   @updatedAt
 
   @@unique([userId, permissionId])
+  @@index([permissionId])
   @@map("user_permissions")
 }
 
@@ -287,6 +291,7 @@ model ClientCase {
   updatedAt             DateTime       @updatedAt
 
   @@index([userId, isDeleted, createdAt])
+  @@index([assignedConsultantId, isDeleted])
   @@index([serviceId])
   @@map("client_cases")
 }
@@ -387,6 +392,8 @@ model Payment {
 
   @@unique([idempotencyKey])
   @@index([caseId, isDeleted, paymentDate])
+  @@index([installmentId, isDeleted])
+  @@index([status, isDeleted])
   @@map("payments")
 }
 
@@ -416,6 +423,8 @@ model Document {
   updatedAt      DateTime @updatedAt
 
   @@index([userId, caseId, isDeleted])
+  @@index([caseId, isDeleted])
+  @@index([paymentId])
   @@map("documents")
 }
 
@@ -474,6 +483,8 @@ model Receipt {
   payment         Payment?   @relation("PaymentReceipts", fields: [paymentId], references: [id], onDelete: SetNull)
 
   @@index([caseId, isDeleted])
+  @@index([paymentId])
+  @@index([invoiceId])
   @@map("receipts")
 }
 

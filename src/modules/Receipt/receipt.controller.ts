@@ -38,4 +38,10 @@ const downloadReceiptPdf = catchAsync(async (req: Request, res: Response) => {
   res.send(pdfBuffer);
 });
 
-export const ReceiptController = { createReceipt, listReceipts, getReceipt, downloadReceiptPdf };
+const getAllReceipts = catchAsync(async (req: Request, res: Response) => {
+  const caseId = (req.query.caseId || req.query.clientCaseId) as string | undefined;
+  const data = await ReceiptService.getAllReceipts({ caseId }, req.user!.id, staff(req), req.user?.role);
+  sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipts retrieved successfully", data });
+});
+
+export const ReceiptController = { createReceipt, listReceipts, getAllReceipts, getReceipt, downloadReceiptPdf };

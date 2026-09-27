@@ -7,6 +7,11 @@ import { InvoiceValidation } from "./invoice.validation";
 
 const router = Router();
 
+router.get(
+  "/",
+  auth(PERMISSIONS.INVOICE_READ),
+  InvoiceController.getAllInvoices
+);
 router.post(
   "/cases/:caseId",
   auth(PERMISSIONS.INVOICE_GENERATE),

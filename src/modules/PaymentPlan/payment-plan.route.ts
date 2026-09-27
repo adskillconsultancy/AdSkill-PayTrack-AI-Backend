@@ -7,6 +7,16 @@ import { PaymentPlanValidation } from "./payment-plan.validation";
 
 const router = Router();
 
+router.get(
+  "/",
+  auth(PERMISSIONS.PLAN_READ),
+  PaymentPlanController.getAllPaymentPlans,
+);
+router.post(
+  "/",
+  auth(PERMISSIONS.PLAN_CREATE),
+  PaymentPlanController.createPaymentPlanRoot,
+);
 router.post(
   "/cases/:caseId",
   auth(PERMISSIONS.PLAN_CREATE),

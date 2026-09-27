@@ -105,39 +105,50 @@ const createUser = async (
 
   // Resolve role: use provided roleId, roleName, or default to CLIENT per specification
   let targetRoleId = payload.roleId;
+  let targetRole: { id: string; name: string } | null = null;
 
   if (!targetRoleId) {
     const roleToFind = payload.roleName || "CLIENT";
-    const role = await prisma.userRole.findFirst({
+    targetRole = await prisma.userRole.findFirst({
       where: { name: roleToFind, isDeleted: false },
+      select: { id: true, name: true },
     });
 
-    if (!role) {
+    if (!targetRole) {
       throw new AppError(
         httpStatus.BAD_REQUEST,
         `Role "${roleToFind}" does not exist in the database`,
       );
     }
-    if (role.name !== "CLIENT") {
-      const isSuperAdmin = actorRole === "SUPER_ADMIN";
-      const canManageRole = actorPermissions.includes(PERMISSIONS.USER_MANAGE_ROLE);
-      if (!isSuperAdmin && !canManageRole) {
-        throw new AppError(
-          httpStatus.FORBIDDEN,
-          "Only Super Administrator can assign employee/staff roles",
-        );
-      }
-    }
-    targetRoleId = role.id;
+    targetRoleId = targetRole.id;
   } else {
     // Validate that roleId exists and is not soft deleted
-    const role = await prisma.userRole.findFirst({
+    targetRole = await prisma.userRole.findFirst({
       where: { id: targetRoleId, isDeleted: false },
+      select: { id: true, name: true },
     });
-    if (!role) {
+    if (!targetRole) {
       throw new AppError(
         httpStatus.BAD_REQUEST,
         "Specified role does not exist",
+      );
+    }
+  }
+
+  // Privilege Escalation Guard: Check staff and Super Admin role assignment permissions
+  if (targetRole.name !== "CLIENT") {
+    const isSuperAdmin = actorRole === "SUPER_ADMIN";
+    const canManageRole = actorPermissions.includes(PERMISSIONS.USER_MANAGE_ROLE);
+    if (!isSuperAdmin && !canManageRole) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "Only Super Administrator can assign employee/staff roles",
+      );
+    }
+    if (targetRole.name === "SUPER_ADMIN" && !isSuperAdmin) {
+      throw new AppError(
+        httpStatus.FORBIDDEN,
+        "Only Super Administrator can assign the Super Administrator role",
       );
     }
   }

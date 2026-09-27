@@ -45,56 +45,57 @@ const getKPIs = async (
     getDateRangeForPeriod(period, customStart, customEnd);
 
   const [
-    periodVerifiedPayments,
-    previousVerifiedPayments,
-    allVerifiedPayments,
-    pendingPayments,
-    allActivePlans,
+    periodVerifiedAggregate,
+    previousVerifiedAggregate,
+    allVerifiedAggregate,
+    pendingPaymentsAggregate,
+    allActivePlansAggregate,
     activeClientsCount,
     openCasesCount,
   ] = await Promise.all([
     // Verified payments within selected period
-    prisma.payment.findMany({
+    prisma.payment.aggregate({
       where: {
         isDeleted: false,
         status: { in: ["VERIFIED", "COMPLETED", "PAID"] },
         paymentDate: { gte: startDate, lte: endDate },
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
 
     // Verified payments in previous window for comparison
-    prisma.payment.findMany({
+    prisma.payment.aggregate({
       where: {
         isDeleted: false,
         status: { in: ["VERIFIED", "COMPLETED", "PAID"] },
         paymentDate: { gte: previousStartDate, lte: previousEndDate },
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
 
     // All-time verified collections for total balance calculation
-    prisma.payment.findMany({
+    prisma.payment.aggregate({
       where: {
         isDeleted: false,
         status: { in: ["VERIFIED", "COMPLETED", "PAID"] },
       },
-      select: { amount: true },
+      _sum: { amount: true },
     }),
 
     // All active pending payments awaiting verification
-    prisma.payment.findMany({
+    prisma.payment.aggregate({
       where: {
         isDeleted: false,
         status: "PENDING",
       },
-      select: { amount: true },
+      _sum: { amount: true },
+      _count: { _all: true },
     }),
 
     // All active payment plans
-    prisma.paymentPlan.findMany({
+    prisma.paymentPlan.aggregate({
       where: { isDeleted: false, isActive: true },
-      select: { contractedFee: true },
+      _sum: { contractedFee: true },
     }),
 
     // Active clients count
@@ -118,30 +119,11 @@ const getKPIs = async (
     }),
   ]);
 
-  const totalPeriodRevenue = periodVerifiedPayments.reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0,
-  );
-  const previousRevenue = previousVerifiedPayments.reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0,
-  );
-
-  const pendingRevenue = pendingPayments.reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0,
-  );
-
-  const totalContracted = allActivePlans.reduce(
-    (sum, plan) => sum + Number(plan.contractedFee || 0),
-    0,
-  );
-
-  const allTimeVerified = allVerifiedPayments.reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0,
-  );
-
+  const totalPeriodRevenue = Number(periodVerifiedAggregate._sum.amount || 0);
+  const previousRevenue = Number(previousVerifiedAggregate._sum.amount || 0);
+  const pendingRevenue = Number(pendingPaymentsAggregate._sum.amount || 0);
+  const totalContracted = Number(allActivePlansAggregate._sum.contractedFee || 0);
+  const allTimeVerified = Number(allVerifiedAggregate._sum.amount || 0);
   const outstandingReceivables = Math.max(0, totalContracted - allTimeVerified);
 
   // Calculate percentage growth compared to previous window
@@ -161,7 +143,7 @@ const getKPIs = async (
     outstandingReceivables,
     activeClientsCount,
     openCasesCount,
-    pendingVerificationCount: pendingPayments.length,
+    pendingVerificationCount: pendingPaymentsAggregate._count._all,
     revenueGrowthPercentage,
   };
 };

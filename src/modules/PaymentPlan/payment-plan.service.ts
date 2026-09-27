@@ -48,7 +48,11 @@ const createPaymentPlan = async (
   });
   if (!serviceCase) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
 
-  const baseFee = new Prisma.Decimal(serviceCase.service.baseFee);
+  const baseFee = payload.totalAmount
+    ? new Prisma.Decimal(payload.totalAmount)
+    : payload.contractedFee
+    ? new Prisma.Decimal(payload.contractedFee)
+    : new Prisma.Decimal(serviceCase.service.baseFee);
   const discount = new Prisma.Decimal(payload.discountAmount ?? 0);
   const deposit = new Prisma.Decimal(payload.depositAmount ?? 0);
   const contractedFee = baseFee.minus(discount);
@@ -186,9 +190,37 @@ const getPaymentPlanById = async (id: string, actorId: string, staff: boolean, u
   return plan;
 };
 
+const getAllPaymentPlans = async (
+  query: { caseId?: string },
+  actorId: string,
+  staff: boolean,
+  userRole?: string,
+) => {
+  const andConditions: Prisma.PaymentPlanWhereInput[] = [{ isDeleted: false }];
+
+  if (query.caseId) {
+    await ensureCaseAccess(query.caseId, actorId, staff, userRole);
+    andConditions.push({ caseId: query.caseId });
+  } else {
+    if (!staff) {
+      andConditions.push({ case: { userId: actorId } });
+    }
+    if (userRole === "CONSULTANT") {
+      andConditions.push({ case: { assignedConsultantId: actorId } });
+    }
+  }
+
+  return prisma.paymentPlan.findMany({
+    where: { AND: andConditions },
+    include: planInclude,
+    orderBy: { createdAt: "desc" },
+  });
+};
+
 export const PaymentPlanService = {
   createPaymentPlan,
   updatePaymentPlan,
   getPaymentPlansForCase,
   getPaymentPlanById,
+  getAllPaymentPlans,
 };

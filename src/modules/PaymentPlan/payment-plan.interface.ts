@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 
 export type TCreatePaymentPlanPayload = {
   currency?: string;
+  contractedFee?: number;
+  totalAmount?: number;
   discountAmount?: number;
   discountReason?: string;
   depositAmount?: number;

@@ -19,6 +19,16 @@ router.get("/client-summary", auth(), DashboardController.getClientSummary);
 router.use(auth(PERMISSIONS.DASHBOARD_VIEW, PERMISSIONS.REPORT_VIEW));
 
 /**
+ * GET /api/v1/dashboard
+ * Root dashboard KPI overview
+ */
+router.get(
+  "/",
+  validateRequest(DashboardValidation.dashboardFilterSchema),
+  DashboardController.getKPIs,
+);
+
+/**
  * GET /api/v1/dashboard/kpis
  * Executive KPI summary cards (Revenue, Pending, Receivables, Clients, Cases)
  */

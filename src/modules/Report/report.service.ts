@@ -93,33 +93,28 @@ const generateReport = async (
   }
 
   // 1. Calculate Executive KPIs across verified income and contracted fees using exact Prisma.Decimal
-  const [allVerifiedPayments, allActivePlans] = await Promise.all([
-    prisma.payment.findMany({
+  const [allVerifiedPaymentsAggregate, allActivePlansAggregate] = await Promise.all([
+    prisma.payment.aggregate({
       where: {
         isDeleted: false,
         status: { in: ["VERIFIED", "COMPLETED", "PAID"] },
         ...(currency && currency !== "ALL" ? { currency: currency.trim().toUpperCase() } : {}),
       },
-      select: { amount: true },
+      _sum: { amount: true },
+      _count: { _all: true },
     }),
-    prisma.paymentPlan.findMany({
+    prisma.paymentPlan.aggregate({
       where: {
         isDeleted: false,
         isActive: true,
         ...(currency && currency !== "ALL" ? { currency: currency.trim().toUpperCase() } : {}),
       },
-      select: { contractedFee: true },
+      _sum: { contractedFee: true },
     }),
   ]);
 
-  const totalVerifiedIncomeDec = allVerifiedPayments.reduce(
-    (sum, p) => sum.plus(new Prisma.Decimal(p.amount)),
-    new Prisma.Decimal(0),
-  );
-  const totalContractedFeesDec = allActivePlans.reduce(
-    (sum, plan) => sum.plus(new Prisma.Decimal(plan.contractedFee)),
-    new Prisma.Decimal(0),
-  );
+  const totalVerifiedIncomeDec = allVerifiedPaymentsAggregate._sum.amount ?? new Prisma.Decimal(0);
+  const totalContractedFeesDec = allActivePlansAggregate._sum.contractedFee ?? new Prisma.Decimal(0);
   const totalOutstandingReceivablesDec = totalContractedFeesDec.gt(totalVerifiedIncomeDec)
     ? totalContractedFeesDec.minus(totalVerifiedIncomeDec)
     : new Prisma.Decimal(0);
@@ -128,7 +123,7 @@ const generateReport = async (
     totalVerifiedIncome: totalVerifiedIncomeDec.toNumber(),
     totalContractedFees: totalContractedFeesDec.toNumber(),
     totalOutstandingReceivables: totalOutstandingReceivablesDec.toNumber(),
-    verifiedCollectionsCount: allVerifiedPayments.length,
+    verifiedCollectionsCount: allVerifiedPaymentsAggregate._count._all,
   };
 
   // 2. Fetch total count of verified payments matching the filters

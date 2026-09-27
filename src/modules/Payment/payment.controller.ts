@@ -13,6 +13,7 @@ const createPayment = catchAsync(async (req: Request, res: Response) => {
     isStaff(req),
     req.user?.role,
     req.user?.email,
+    req.user?.permissions || [],
   );
   sendResponse(res, { statusCode: httpStatus.CREATED, success: true, message: "Payment recorded successfully", data: result });
 });

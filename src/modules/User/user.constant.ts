@@ -83,6 +83,7 @@ export const userSearchableFields: string[] = [
 
 export const userFilterableFields: string[] = [
   "searchTerm",
+  "search",
   "roleId",
   "roleName",
   "status",

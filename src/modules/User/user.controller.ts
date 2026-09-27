@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import httpStatus from "http-status";
+import AppError from "../../errors/AppError";
 import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { userFilterableFields } from "./user.constant";
@@ -11,7 +12,7 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     req.user?.id,
     req.user?.email,
     req.user?.role,
-    req.user?.effectivePermissions,
+    req.user?.permissions,
   );
 
   sendResponse(res, {
@@ -23,12 +24,22 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllUsers = catchAsync(async (req: Request, res: Response) => {
+  if (req.user?.role === "CLIENT") {
+    throw new AppError(
+      httpStatus.FORBIDDEN,
+      "Clients are not authorized to view the user directory",
+    );
+  }
+
   // Extract filter parameters
-  const filters = Object.fromEntries(
+  const filters: Record<string, any> = Object.fromEntries(
     Object.entries(req.query).filter(([key]) =>
       userFilterableFields.includes(key),
     ),
   );
+  if (req.query.search && !filters.searchTerm) {
+    filters.searchTerm = req.query.search as string;
+  }
 
   // Extract pagination parameters
   const paginationOptions = {
@@ -83,7 +94,7 @@ const updateUser = catchAsync(async (req: Request, res: Response) => {
     req.user?.id,
     req.user?.email,
     req.user?.role,
-    req.user?.effectivePermissions,
+    req.user?.permissions,
   );
 
   sendResponse(res, {

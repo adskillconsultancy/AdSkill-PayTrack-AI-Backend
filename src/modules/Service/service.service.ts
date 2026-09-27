@@ -218,8 +218,8 @@ const getAllServices = async (
     isDeleted: isDeletedBool,
   });
 
-  // Reusable multi-field search (name, code, description)
-  const searchCondition = buildSearchFilter(searchTerm, serviceSearchableFields);
+  const searchWord = searchTerm || (filters as any).search;
+  const searchCondition = buildSearchFilter(searchWord, serviceSearchableFields);
   if (searchCondition) {
     andConditions.push(searchCondition);
   }

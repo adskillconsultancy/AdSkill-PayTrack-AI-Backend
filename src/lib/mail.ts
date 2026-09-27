@@ -11,13 +11,20 @@ interface SendMailOptions {
   metadata?: Record<string, unknown>;
 }
 
-// Create reusable transporter
-const createTransporter = () => {
+// Reusable singleton transporter
+let cachedTransporter: ReturnType<typeof nodemailer.createTransport> | null | undefined = undefined;
+
+const getTransporter = () => {
+  if (cachedTransporter !== undefined) {
+    return cachedTransporter;
+  }
+
   if (!config.smtp.user || !config.smtp.pass) {
+    cachedTransporter = null;
     return null;
   }
 
-  return nodemailer.createTransport({
+  cachedTransporter = nodemailer.createTransport({
     host: config.smtp.host,
     port: config.smtp.port,
     secure: config.smtp.secure,
@@ -25,7 +32,12 @@ const createTransporter = () => {
       user: config.smtp.user,
       pass: config.smtp.pass,
     },
+    pool: true,
+    maxConnections: 3,
+    maxMessages: 100,
   });
+
+  return cachedTransporter;
 };
 
 /**
@@ -188,7 +200,7 @@ export const sendMail = async ({
   metadata,
 }: SendMailOptions): Promise<boolean> => {
   try {
-    const transporter = createTransporter();
+    const transporter = getTransporter();
 
     if (!transporter) {
       console.log(`[MAIL_DEV_LOG] SMTP not configured. Simulating email to: ${to} | Subject: "${subject}"`);

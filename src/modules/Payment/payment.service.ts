@@ -5,6 +5,7 @@ import prisma from "../../lib/prisma";
 import { getPrivateObjectSignedUrl } from "../../lib/r2";
 import { AuditService } from "../Audit/audit.service";
 import { NotificationService } from "../Notification/notification.service";
+import { PERMISSIONS } from "../User/user.constant";
 import { TCreatePaymentPayload, TPaymentFilters } from "./payment.interface";
 
 const paymentInclude = {
@@ -127,6 +128,7 @@ const createPayment = async (
   staff: boolean,
   userRole?: string,
   actorEmail?: string,
+  actorPermissions: string[] = [],
 ) => {
   await ensureCase(payload.caseId, actorId, staff, userRole);
   const amount = new Prisma.Decimal(payload.amount);
@@ -160,7 +162,9 @@ const createPayment = async (
 
   const payment = await prisma.$transaction(
     async (tx) => {
-      const isVerifiableStaff = userRole === "SUPER_ADMIN" || userRole === "MANAGER";
+      const isVerifiableStaff =
+        userRole === "SUPER_ADMIN" ||
+        actorPermissions.includes(PERMISSIONS.PAYMENT_VERIFY);
       const isVerified = isVerifiableStaff && payload.status !== "PENDING";
       const initialStatus = isVerified ? "VERIFIED" : "PENDING";
 

@@ -18,11 +18,14 @@ const createService = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllServices = catchAsync(async (req: Request, res: Response) => {
-  const filters = Object.fromEntries(
+  const filters: Record<string, any> = Object.fromEntries(
     Object.entries(req.query).filter(([key]) =>
       serviceFilterableFields.includes(key),
     ),
   );
+  if (req.query.search && !filters.searchTerm) {
+    filters.searchTerm = req.query.search as string;
+  }
 
   const paginationOptions = {
     page: req.query.page as string | undefined,
