@@ -18,6 +18,8 @@ import { DashboardRoutes } from "../modules/Dashboard/dashboard.route";
 import { SearchRoutes } from "../modules/Search/search.route";
 import { BackupRoutes } from "../modules/Backup/backup.route";
 
+import { NotificationRoutes } from "../modules/Notification/notification.route";
+
 const router = Router();
 
 const moduleRoutes = [
@@ -93,13 +95,10 @@ const moduleRoutes = [
     path: "/backups",
     route: BackupRoutes,
   },
-  // Upcoming modules:
-  // { path: '/clients', route: ClientRoutes },
-  // { path: '/payment-plans', route: PaymentPlanRoutes },
-  // { path: '/payments', route: PaymentRoutes },
-  // { path: '/invoices', route: InvoiceRoutes },
-  // { path: '/notifications', route: NotificationRoutes },
-  // { path: '/ai', route: AIRoutes },
+  {
+    path: "/notifications",
+    route: NotificationRoutes,
+  },
 ];
 
 moduleRoutes.forEach((route) => router.use(route.path, route.route));

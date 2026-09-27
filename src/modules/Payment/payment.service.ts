@@ -4,6 +4,7 @@ import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
 import { getPrivateObjectSignedUrl } from "../../lib/r2";
 import { AuditService } from "../Audit/audit.service";
+import { NotificationService } from "../Notification/notification.service";
 import { TCreatePaymentPayload, TPaymentFilters } from "./payment.interface";
 
 const paymentInclude = {
@@ -225,6 +226,20 @@ const createPayment = async (
     },
   });
 
+  // Asynchronously dispatch payment recorded notifications & emails
+  NotificationService.dispatchPaymentRecordedNotification({
+    paymentId: payment.id,
+    caseId: payment.caseId,
+    caseCode: payment.case.caseCode,
+    clientId: payment.case.userId,
+    clientName: payment.case.user?.name || "Client",
+    clientEmail: payment.case.user?.email || "",
+    amount: payment.amount.toString(),
+    currency: payment.currency,
+    paymentMethod: payment.paymentMethod,
+    assignedConsultantId: payment.case.assignedConsultantId,
+  }).catch((err) => console.error("[NOTIFICATION_ERROR] dispatchPaymentRecordedNotification:", err));
+
   return payment;
 };
 
@@ -276,6 +291,21 @@ const verifyPayment = async (id: string, actorId: string, actorEmail?: string) =
       currency: updated.currency,
     },
   });
+
+  // Asynchronously dispatch payment verified notification & email
+  NotificationService.dispatchPaymentVerifiedNotification({
+    paymentId: updated.id,
+    caseId: updated.caseId,
+    caseCode: updated.case.caseCode,
+    clientId: updated.case.userId,
+    clientName: updated.case.user?.name || "Client",
+    clientEmail: updated.case.user?.email || "",
+    amount: updated.amount.toString(),
+    currency: updated.currency,
+    receiptNumber: `PAY-${updated.id.slice(0, 8).toUpperCase()}`,
+    verifierName: updated.verifiedBy?.name || "AdSkill Finance",
+    assignedConsultantId: updated.case.assignedConsultantId,
+  }).catch((err) => console.error("[NOTIFICATION_ERROR] dispatchPaymentVerifiedNotification:", err));
 
   return updated;
 };

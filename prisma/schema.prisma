@@ -63,6 +63,22 @@ enum NoteVisibility {
   SUPER_ADMIN
 }
 
+enum NotificationType {
+  CASE
+  PAYMENT
+  DOCUMENT
+  INVOICE
+  SUPPORT
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 // ==================== MODELS ====================
 
 // Dynamic User Role model - supports future role expansion
@@ -167,6 +183,10 @@ model User {
   consultantSupportTickets SupportTicket[] @relation("ConsultantSupportTickets")
   handledSupportTickets   SupportTicket[]  @relation("StaffHandledTickets")
   supportMessages         SupportMessage[] @relation("MessageSender")
+
+  // Notification Relations
+  notifications           Notification[]
+  notificationPreference  NotificationPreference?
 
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
@@ -559,4 +579,60 @@ model SupportMessage {
   @@map("support_messages")
 }
 
+// ==================== NOTIFICATIONS & COMMUNICATIONS ====================
 
+model Notification {
+  id           String               @id @default(uuid())
+  userId       String
+  title        String
+  message      String               @db.Text
+  type         NotificationType     @default(SYSTEM)
+  priority     NotificationPriority @default(NORMAL)
+  entityType   String?              // e.g. "CASE", "PAYMENT", "INVOICE", "SUPPORT_TICKET"
+  entityId     String?              // target entity UUID
+  actionUrl    String?              // deep link path for frontend routing
+  isRead       Boolean              @default(false)
+  readAt       DateTime?
+  isDeleted    Boolean              @default(false)
+  deletedAt    DateTime?
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([userId, isRead, isDeleted, createdAt])
+  @@index([userId, isDeleted, createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  emailOnCaseUpdates Boolean  @default(true)
+  emailOnPayments    Boolean  @default(true)
+  emailOnDocuments   Boolean  @default(true)
+  emailOnSupport     Boolean  @default(true)
+  inAppAlerts        Boolean  @default(true)
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("notification_preferences")
+}
+
+model EmailAuditLog {
+  id           String   @id @default(uuid())
+  recipient    String
+  subject      String
+  templateName String
+  status       String   // "SENT", "FAILED", "QUEUED"
+  errorMessage String?
+  metadata     Json?
+  sentAt       DateTime @default(now())
+
+  @@index([recipient, sentAt])
+  @@map("email_audit_logs")
+}

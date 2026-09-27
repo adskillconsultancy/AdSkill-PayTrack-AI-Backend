@@ -24,4 +24,13 @@ export default {
     signed_url_expires_in: Number(process.env.R2_SIGNED_URL_EXPIRES_IN) || 300,
     max_file_size_mb: Number(process.env.R2_MAX_FILE_SIZE_MB) || 10,
   },
+  smtp: {
+    host: process.env.SMTP_HOST || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === "true",
+    user: process.env.SMTP_USER || "",
+    pass: process.env.SMTP_PASS || "",
+    from_name: process.env.EMAIL_FROM_NAME || "AdSkill PayTrack AI",
+    from_email: process.env.EMAIL_FROM_ADDRESS || "notifications@adskillconsultancy.com",
+  },
 };

@@ -3,6 +3,7 @@ import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
 import { AuditService } from "../Audit/audit.service";
+import { NotificationService } from "../Notification/notification.service";
 import { TCreateClientCasePayload, TUpdateClientCasePayload } from "./client-case.interface";
 
 const caseSelect = {
@@ -210,6 +211,19 @@ const createClientCase = async (
       serviceName: created.serviceNameSnapshot,
     },
   });
+
+  // Asynchronously dispatch isolated notifications & emails
+  NotificationService.dispatchCaseCreatedNotification({
+    caseId: created.id,
+    caseCode: created.caseCode,
+    clientId: created.userId,
+    clientName: created.user?.name || "Valued Client",
+    clientEmail: created.user?.email || "",
+    serviceName: created.serviceNameSnapshot,
+    assignedConsultantId: created.assignedConsultant?.id || created.assignedConsultantId,
+    creatorId: actorUserId,
+    creatorRole: userRole,
+  }).catch((err) => console.error("[NOTIFICATION_ERROR] dispatchCaseCreatedNotification:", err));
 
   return sanitizeCaseNotes(created, userRole);
 };
