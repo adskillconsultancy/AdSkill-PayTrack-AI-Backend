@@ -249,7 +249,7 @@ export const NotificationService = {
         </div>
       </div>
       <p>You can track milestone schedules, view invoices, and communicate with your assigned consultant via your secure client portal.</p>
-      <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/tracking" class="btn">View Case Tracker</a>
+      <a href="https://paytrack.adskillconsultancy.com/tracking" class="btn">View Case Tracker</a>
       `
     );
 
@@ -294,7 +294,7 @@ export const NotificationService = {
           <div class="detail-row"><span class="detail-label">Case Code:</span><span class="detail-value">${caseCode}</span></div>
           <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${serviceName}</span></div>
         </div>
-        <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/clients/${clientId}" class="btn">Open Case File</a>
+        <a href="https://paytrack.adskillconsultancy.com/clients/${clientId}" class="btn">Open Case File</a>
         `
       );
 
@@ -337,7 +337,7 @@ export const NotificationService = {
             <div class="detail-row"><span class="detail-label">Case:</span><span class="detail-value">${caseCode}</span></div>
             <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${serviceName}</span></div>
           </div>
-          <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/clients/${clientId}" class="btn">View Case Details</a>
+          <a href="https://paytrack.adskillconsultancy.com/clients/${clientId}" class="btn">View Case Details</a>
           `
         );
 
@@ -405,7 +405,7 @@ export const NotificationService = {
         <div class="detail-row"><span class="detail-label">Status:</span><span class="detail-value">PENDING VERIFICATION</span></div>
       </div>
       <p>An official receipt will be generated and emailed to you as soon as verification completes.</p>
-      <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/payments" class="btn">View Payment Status</a>
+      <a href="https://paytrack.adskillconsultancy.com/payments" class="btn">View Payment Status</a>
       `
     );
 
@@ -506,7 +506,7 @@ export const NotificationService = {
         <div class="detail-row"><span class="detail-label">Status:</span><span class="detail-value" style="color: #059669;">COMPLETED / PAID</span></div>
       </div>
       <p>Your official tax-compliant receipt is available for download in your portal.</p>
-      <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/invoices-receipts" class="btn">Download Official Receipt</a>
+      <a href="https://paytrack.adskillconsultancy.com/invoices-receipts" class="btn">Download Official Receipt</a>
       `
     );
 
@@ -670,7 +670,7 @@ export const NotificationService = {
             <div class="detail-row"><span class="detail-label">Due Date:</span><span class="detail-value">${dueDate.toLocaleDateString()}</span></div>
           </div>
           <p>Please log in to your portal to review payment instructions and submit your receipt.</p>
-          <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/payments" class="btn">Pay Now & View Portal</a>
+          <a href="https://paytrack.adskillconsultancy.com/payments" class="btn">Pay Now & View Portal</a>
           `
         );
 
@@ -779,7 +779,7 @@ export const NotificationService = {
         ${customNote ? `<div class="detail-row"><span class="detail-label">Staff Note:</span><span class="detail-value">${customNote}</span></div>` : ""}
       </div>
       <p>Please log in to your portal to review payment options or upload payment proof.</p>
-      <a href="https://ad-skill-pay-track-ai-frontend.vercel.app/payments" class="btn">View Payment Portal</a>
+      <a href="https://paytrack.adskillconsultancy.com/payments" class="btn">View Payment Portal</a>
       `
     );
 

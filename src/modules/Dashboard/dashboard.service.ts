@@ -562,7 +562,7 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
     email: ADSKILL.email,
     phone: ADSKILL.phone,
     whatsapp: "+1 (800) 235-7454",
-    portalUrl: "https://portal.adskillconsultancy.com",
+    portalUrl: "https://paytrack.adskillconsultancy.com",
   };
 
   const feeDisclaimer =

@@ -44,7 +44,7 @@ const getTransporter = () => {
  * Base email layout wrapper with AdSkill PayTrack branding
  */
 export const wrapEmailLayout = (title: string, contentHtml: string): string => {
-  const portalUrl = config.client_url || "https://ad-skill-pay-track-ai-frontend.vercel.app";
+  const portalUrl = config.client_url || "https://paytrack.adskillconsultancy.com";
 
   return `
 <!DOCTYPE html>

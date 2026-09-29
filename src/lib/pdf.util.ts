@@ -10,7 +10,7 @@ export const ADSKILL = {
   country: "United States of America",
   phone: "+1 (800) 235-7454",
   email: "billing@adskillconsultancy.com",
-  website: "portal.adskillconsultancy.com",
+  website: "paytrack.adskillconsultancy.com",
   taxId: "EIN: 47-8921034",
   disclaimer:
     "This document is an official financial instrument issued by AdSkill Consultancy Inc. All fees are subject to the terms of the signed client services agreement. Government filing fees (USCIS/consular) and third-party fees are pass-through costs not retained by AdSkill. AdSkill professional fees are strictly non-refundable once service milestones have commenced unless expressly agreed in writing. AdSkill Consultancy Inc. is a professional corporate & immigration consulting advisory and does not provide formal legal representation. Certified copies may be re-issued upon request without modifying original historical records.",
