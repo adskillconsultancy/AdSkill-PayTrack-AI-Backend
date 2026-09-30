@@ -88,4 +88,14 @@ router.get(
   DashboardController.getRecentActivity,
 );
 
+/**
+ * GET /api/v1/dashboard/attendance-summary
+ * Staff shift & workforce attendance overview for selected period
+ */
+router.get(
+  "/attendance-summary",
+  validateRequest(DashboardValidation.dashboardFilterSchema),
+  DashboardController.getAttendanceSummary,
+);
+
 export const DashboardRoutes = router;

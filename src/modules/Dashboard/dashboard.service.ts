@@ -10,6 +10,7 @@ import {
   TDashboardPaymentAnalytics,
   TDashboardRecentActivityItem,
   TDashboardVerificationQueueItem,
+  TDashboardAttendanceSummary,
   TDailyFinancialTrend,
   TDailyGrowthTrend,
   TClientDashboardSummary,
@@ -52,6 +53,10 @@ const getKPIs = async (
     allActivePlansAggregate,
     activeClientsCount,
     openCasesCount,
+    periodNewClientsCount,
+    periodNewCasesCount,
+    attendanceAggregate,
+    currentlyActiveAttendanceCount,
   ] = await Promise.all([
     // Verified payments within selected period
     prisma.payment.aggregate({
@@ -73,7 +78,7 @@ const getKPIs = async (
       _sum: { amount: true },
     }),
 
-    // All-time verified collections for total balance calculation
+    // All-time verified collections for reference
     prisma.payment.aggregate({
       where: {
         isDeleted: false,
@@ -82,27 +87,33 @@ const getKPIs = async (
       _sum: { amount: true },
     }),
 
-    // All active pending payments awaiting verification
+    // Pending payments awaiting verification within selected period
     prisma.payment.aggregate({
       where: {
         isDeleted: false,
         status: "PENDING",
+        paymentDate: { gte: startDate, lte: endDate },
       },
       _sum: { amount: true },
       _count: { _all: true },
     }),
 
-    // All active payment plans
+    // Active payment plans contracted in this period
     prisma.paymentPlan.aggregate({
-      where: { isDeleted: false, isActive: true },
+      where: {
+        isDeleted: false,
+        isActive: true,
+        createdAt: { gte: startDate, lte: endDate },
+      },
       _sum: { contractedFee: true },
     }),
 
-    // Active clients count
+    // Active clients created in this period
     prisma.user.count({
       where: {
         isDeleted: false,
         status: "ACTIVE",
+        createdAt: { gte: startDate, lte: endDate },
         OR: [
           { clientId: { not: null } },
           { role: { name: "CLIENT" } },
@@ -110,11 +121,63 @@ const getKPIs = async (
       },
     }),
 
-    // Open cases count
+    // Open cases created in this period
     prisma.clientCase.count({
       where: {
         isDeleted: false,
+        createdAt: { gte: startDate, lte: endDate },
         caseStatus: { in: ["INTAKE", "ACTIVE", "ON_HOLD"] },
+      },
+    }),
+
+    // Period new clients count
+    prisma.user.count({
+      where: {
+        isDeleted: false,
+        createdAt: { gte: startDate, lte: endDate },
+        OR: [
+          { clientId: { not: null } },
+          { role: { name: "CLIENT" } },
+        ],
+      },
+    }),
+
+    // Period new cases count
+    prisma.clientCase.count({
+      where: {
+        isDeleted: false,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+    }),
+
+    // Period attendance aggregate (hours logged)
+    prisma.attendance.aggregate({
+      where: {
+        isDeleted: false,
+        OR: [
+          { status: "CLOCKED_IN" },
+          {
+            workDate: {
+              gte: new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate())),
+              lte: new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate())),
+            },
+          },
+          {
+            clockIn: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        ],
+      },
+      _sum: { totalMinutes: true },
+    }),
+
+    // Currently active clocked-in staff count
+    prisma.attendance.count({
+      where: {
+        isDeleted: false,
+        status: "CLOCKED_IN",
       },
     }),
   ]);
@@ -123,8 +186,7 @@ const getKPIs = async (
   const previousRevenue = Number(previousVerifiedAggregate._sum.amount || 0);
   const pendingRevenue = Number(pendingPaymentsAggregate._sum.amount || 0);
   const totalContracted = Number(allActivePlansAggregate._sum.contractedFee || 0);
-  const allTimeVerified = Number(allVerifiedAggregate._sum.amount || 0);
-  const outstandingReceivables = Math.max(0, totalContracted - allTimeVerified);
+  const outstandingReceivables = Math.max(0, totalContracted - totalPeriodRevenue);
 
   // Calculate percentage growth compared to previous window
   let revenueGrowthPercentage = 0;
@@ -136,6 +198,10 @@ const getKPIs = async (
     revenueGrowthPercentage = 100.0;
   }
 
+  const periodTotalHoursLogged = Number(
+    (((attendanceAggregate._sum.totalMinutes || 0) as number) / 60).toFixed(1),
+  );
+
   return {
     totalRevenue: totalPeriodRevenue,
     pendingRevenue,
@@ -145,6 +211,10 @@ const getKPIs = async (
     openCasesCount,
     pendingVerificationCount: pendingPaymentsAggregate._count._all,
     revenueGrowthPercentage,
+    periodNewClientsCount,
+    periodNewCasesCount,
+    periodTotalHoursLogged,
+    periodStaffOnDutyCount: currentlyActiveAttendanceCount,
   };
 };
 
@@ -379,12 +449,23 @@ const getClientGrowth = async (
  */
 const getVerificationQueue = async (
   limit: number = 10,
+  filters?: TDashboardFilterQuery,
 ): Promise<TDashboardVerificationQueueItem[]> => {
+  const where: Prisma.PaymentWhereInput = {
+    isDeleted: false,
+    status: "PENDING",
+  };
+  if (filters?.period) {
+    const { startDate, endDate } = getDateRangeForPeriod(
+      filters.period,
+      filters.startDate,
+      filters.endDate,
+    );
+    where.paymentDate = { gte: startDate, lte: endDate };
+  }
+
   const pendingPayments = await prisma.payment.findMany({
-    where: {
-      isDeleted: false,
-      status: "PENDING",
-    },
+    where,
     take: limit,
     orderBy: { recordedAt: "asc" }, // Longest pending first
     include: {
@@ -443,18 +524,30 @@ const getVerificationQueue = async (
 const getCaseDistribution = async (
   filters: TDashboardFilterQuery,
 ): Promise<TDashboardCaseDistribution> => {
+  const { period = "30d", startDate: customStart, endDate: customEnd } = filters;
+  const { startDate, endDate } = getDateRangeForPeriod(
+    period,
+    customStart,
+    customEnd,
+  );
+
+  const where: Prisma.ClientCaseWhereInput = {
+    isDeleted: false,
+    createdAt: { gte: startDate, lte: endDate },
+  };
+
   const [caseStatusCounts, financialStatusCounts, totalCases] = await Promise.all([
     prisma.clientCase.groupBy({
       by: ["caseStatus"],
-      where: { isDeleted: false },
+      where,
       _count: { id: true },
     }),
     prisma.clientCase.groupBy({
       by: ["financialStatus"],
-      where: { isDeleted: false },
+      where,
       _count: { id: true },
     }),
-    prisma.clientCase.count({ where: { isDeleted: false } }),
+    prisma.clientCase.count({ where }),
   ]);
 
   return {
@@ -475,8 +568,20 @@ const getCaseDistribution = async (
  */
 const getRecentActivity = async (
   limit: number = 10,
+  filters?: TDashboardFilterQuery,
 ): Promise<TDashboardRecentActivityItem[]> => {
+  const where: Prisma.AuditLogWhereInput = {};
+  if (filters?.period) {
+    const { startDate, endDate } = getDateRangeForPeriod(
+      filters.period,
+      filters.startDate,
+      filters.endDate,
+    );
+    where.createdAt = { gte: startDate, lte: endDate };
+  }
+
   const logs = await prisma.auditLog.findMany({
+    where,
     take: limit,
     orderBy: { createdAt: "desc" },
     include: {
@@ -678,6 +783,150 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
   };
 };
 
+/**
+ * 7. Staff Shift & Workforce Attendance Overview (Executive Super Admin View)
+ */
+const getAttendanceSummary = async (
+  filters: TDashboardFilterQuery,
+): Promise<TDashboardAttendanceSummary> => {
+  const { period = "today", startDate: customStart, endDate: customEnd } = filters;
+  const { startDate, endDate } = getDateRangeForPeriod(
+    period,
+    customStart,
+    customEnd,
+  );
+
+  const attStartDate = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()));
+  const attEndDate = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()));
+
+  const [
+    currentlyActiveCount,
+    attendancesInRange,
+    totalStaffCount,
+    aiDigest,
+  ] = await Promise.all([
+    prisma.attendance.count({
+      where: {
+        isDeleted: false,
+        status: "CLOCKED_IN",
+      },
+    }),
+    prisma.attendance.findMany({
+      where: {
+        isDeleted: false,
+        OR: [
+          { status: "CLOCKED_IN" },
+          {
+            workDate: {
+              gte: attStartDate,
+              lte: attEndDate,
+            },
+          },
+          {
+            clockIn: {
+              gte: startDate,
+              lte: endDate,
+            },
+          },
+        ],
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        clockIn: "desc",
+      },
+    }),
+    prisma.user.count({
+      where: {
+        isDeleted: false,
+        role: {
+          name: { not: "CLIENT" },
+        },
+      },
+    }),
+    prisma.dailyAiDigest.findFirst({
+      where: {
+        isDeleted: false,
+        date: attStartDate,
+      },
+    }),
+  ]);
+
+  const totalMinutes = attendancesInRange.reduce((acc, curr) => {
+    if (curr.totalMinutes && curr.totalMinutes > 0) {
+      return acc + curr.totalMinutes;
+    }
+    if (curr.status === "CLOCKED_IN" && curr.clockIn) {
+      const elapsed = Math.max(
+        0,
+        Math.floor((Date.now() - new Date(curr.clockIn).getTime()) / 60000),
+      );
+      return acc + elapsed;
+    }
+    return acc;
+  }, 0);
+  const totalHoursLogged = Number((totalMinutes / 60).toFixed(1));
+  const uniqueUserIds = new Set(attendancesInRange.map((r) => r.userId));
+  const activeStaffCount = uniqueUserIds.size;
+
+  const recentRecords = attendancesInRange.slice(0, 10).map((r) => {
+    const elapsedMinutes =
+      r.totalMinutes ||
+      (r.status === "CLOCKED_IN"
+        ? Math.max(
+            0,
+            Math.floor((Date.now() - new Date(r.clockIn).getTime()) / 60000),
+          )
+        : null);
+
+    return {
+      id: r.id,
+      userId: r.userId,
+      userName: r.user?.name || "Staff Member",
+      userEmail: r.user?.email || "",
+      userRole: r.user?.role?.name || "STAFF",
+      clockIn: r.clockIn.toISOString(),
+      clockOut: r.clockOut ? r.clockOut.toISOString() : null,
+      totalMinutes: elapsedMinutes,
+      status: r.status,
+      currentFocus: r.currentFocus,
+    };
+  });
+
+  return {
+    period,
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    currentlyActiveCount,
+    totalHoursLogged,
+    activeStaffCount,
+    totalStaffCount,
+    recentRecords,
+    aiDigest: aiDigest
+      ? {
+          id: aiDigest.id,
+          date: aiDigest.date.toISOString(),
+          summaryContent: aiDigest.summaryContent,
+          totalHoursLogged: aiDigest.totalHoursLogged,
+          activeUsersCount: aiDigest.activeUsersCount,
+          paymentsCollected: aiDigest.paymentsCollected,
+        }
+      : null,
+  };
+};
+
 export const DashboardService = {
   getKPIs,
   getPaymentAnalytics,
@@ -685,6 +934,7 @@ export const DashboardService = {
   getVerificationQueue,
   getCaseDistribution,
   getRecentActivity,
+  getAttendanceSummary,
   getClientSummary,
 };
 

@@ -1,6 +1,7 @@
 import { TDashboardPeriod } from "./dashboard.interface";
 
 export const DASHBOARD_PERIODS: TDashboardPeriod[] = [
+  "all",
   "today",
   "yesterday",
   "7d",
@@ -59,18 +60,35 @@ export const getDateRangeForPeriod = (
   let previousEndDate: Date;
 
   switch (period) {
-    case "today": {
-      startDate = startOfToday;
+    case "all": {
+      startDate = new Date("2020-01-01T00:00:00.000Z");
       endDate = endOfToday;
+      previousStartDate = new Date("2010-01-01T00:00:00.000Z");
+      previousEndDate = new Date("2020-01-01T00:00:00.000Z");
+      break;
+    }
+    case "today": {
+      if (customStart) {
+        startDate = new Date(`${customStart}T00:00:00.000Z`);
+        endDate = new Date(`${customEnd || customStart}T23:59:59.999Z`);
+      } else {
+        startDate = startOfToday;
+        endDate = endOfToday;
+      }
 
       // Previous period: yesterday
-      previousStartDate = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
-      previousEndDate = new Date(endOfToday.getTime() - 24 * 60 * 60 * 1000);
+      previousStartDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
+      previousEndDate = new Date(endDate.getTime() - 24 * 60 * 60 * 1000);
       break;
     }
     case "yesterday": {
-      startDate = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
-      endDate = new Date(endOfToday.getTime() - 24 * 60 * 60 * 1000);
+      if (customStart) {
+        startDate = new Date(`${customStart}T00:00:00.000Z`);
+        endDate = new Date(`${customEnd || customStart}T23:59:59.999Z`);
+      } else {
+        startDate = new Date(startOfToday.getTime() - 24 * 60 * 60 * 1000);
+        endDate = new Date(endOfToday.getTime() - 24 * 60 * 60 * 1000);
+      }
 
       // Previous period: 2 days ago
       previousStartDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);

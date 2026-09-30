@@ -1,4 +1,5 @@
 export type TDashboardPeriod =
+  | "all"
   | "today"
   | "yesterday"
   | "7d"
@@ -21,6 +22,40 @@ export interface TDashboardKPIs {
   openCasesCount: number;
   pendingVerificationCount: number;
   revenueGrowthPercentage: number; // Compared to previous equivalent period
+  periodNewClientsCount?: number;
+  periodNewCasesCount?: number;
+  periodTotalHoursLogged?: number;
+  periodStaffOnDutyCount?: number;
+}
+
+export interface TDashboardAttendanceSummary {
+  period: TDashboardPeriod;
+  startDate: string;
+  endDate: string;
+  currentlyActiveCount: number;
+  totalHoursLogged: number;
+  activeStaffCount: number;
+  totalStaffCount: number;
+  recentRecords: {
+    id: string;
+    userId: string;
+    userName: string;
+    userEmail: string;
+    userRole: string;
+    clockIn: string;
+    clockOut: string | null;
+    totalMinutes: number | null;
+    status: string;
+    currentFocus: string | null;
+  }[];
+  aiDigest: {
+    id: string;
+    date: string;
+    summaryContent: string;
+    totalHoursLogged: number;
+    activeUsersCount: number;
+    paymentsCollected: number;
+  } | null;
 }
 
 export interface TPaymentStatusDistribution {

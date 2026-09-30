@@ -58,7 +58,12 @@ const getClientGrowth = catchAsync(async (req: Request, res: Response) => {
 
 const getVerificationQueue = catchAsync(async (req: Request, res: Response) => {
   const limit = req.query.limit ? Number(req.query.limit) : 10;
-  const result = await DashboardService.getVerificationQueue(limit);
+  const filters: TDashboardFilterQuery = {
+    period: req.query.period as TDashboardFilterQuery["period"],
+    startDate: req.query.startDate as string,
+    endDate: req.query.endDate as string,
+  };
+  const result = await DashboardService.getVerificationQueue(limit, filters);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -87,12 +92,34 @@ const getCaseDistribution = catchAsync(async (req: Request, res: Response) => {
 
 const getRecentActivity = catchAsync(async (req: Request, res: Response) => {
   const limit = req.query.limit ? Number(req.query.limit) : 10;
-  const result = await DashboardService.getRecentActivity(limit);
+  const filters: TDashboardFilterQuery = {
+    period: req.query.period as TDashboardFilterQuery["period"],
+    startDate: req.query.startDate as string,
+    endDate: req.query.endDate as string,
+  };
+  const result = await DashboardService.getRecentActivity(limit, filters);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Recent activity retrieved successfully",
+    data: result,
+  });
+});
+
+const getAttendanceSummary = catchAsync(async (req: Request, res: Response) => {
+  const filters: TDashboardFilterQuery = {
+    period: req.query.period as TDashboardFilterQuery["period"],
+    startDate: req.query.startDate as string,
+    endDate: req.query.endDate as string,
+  };
+
+  const result = await DashboardService.getAttendanceSummary(filters);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Dashboard attendance summary retrieved successfully",
     data: result,
   });
 });
@@ -116,6 +143,7 @@ export const DashboardController = {
   getVerificationQueue,
   getCaseDistribution,
   getRecentActivity,
+  getAttendanceSummary,
   getClientSummary,
 };
 
