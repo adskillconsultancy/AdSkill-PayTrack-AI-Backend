@@ -4,6 +4,8 @@ export type TUserFilterRequest = {
   searchTerm?: string;
   roleId?: string;
   roleName?: string;
+  excludeRoleName?: string;
+  hasAssignedCases?: boolean | string;
   status?: UserStatus;
   email?: string;
   phone?: string;
@@ -11,6 +13,7 @@ export type TUserFilterRequest = {
   isDeleted?: boolean;
   startDate?: string;
   endDate?: string;
+  hasActivityOnDate?: boolean | string;
 };
 
 export type TCreateUserPayload = {

@@ -92,12 +92,15 @@ export const userFilterableFields: string[] = [
   "search",
   "roleId",
   "roleName",
+  "excludeRoleName",
+  "hasAssignedCases",
   "status",
   "email",
   "country",
   "isDeleted",
   "startDate",
   "endDate",
+  "hasActivityOnDate",
 ];
 
 export const userSortableFields: string[] = [

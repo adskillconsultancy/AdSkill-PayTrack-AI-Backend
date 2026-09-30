@@ -52,6 +52,61 @@ const safeUserSelect = {
   updatedAt: true,
 };
 
+// User list projection with assigned cases and date-specific attendance
+const getUserListSelect = (startDate?: string, endDate?: string) => {
+  const attendanceWhere: Prisma.AttendanceWhereInput = {
+    isDeleted: false,
+  };
+  if (startDate || endDate) {
+    attendanceWhere.workDate = {};
+    if (startDate) {
+      const d = new Date(startDate);
+      attendanceWhere.workDate.gte = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+    if (endDate) {
+      const d = new Date(endDate);
+      attendanceWhere.workDate.lte = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+  }
+
+  return {
+    ...safeUserSelect,
+    assignedCases: {
+      where: {
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        caseStatus: true,
+      },
+    },
+    attendances: {
+      where: attendanceWhere,
+      select: {
+        id: true,
+        workDate: true,
+        clockIn: true,
+        clockOut: true,
+        status: true,
+        totalMinutes: true,
+      },
+      orderBy: {
+        clockIn: "desc" as const,
+      },
+      take: 60,
+    },
+    _count: {
+      select: {
+        assignedCases: {
+          where: {
+            isDeleted: false,
+          },
+        },
+      },
+    },
+  };
+};
+
 // Helper to generate a unique Client ID (e.g. ASK-2026-1042)
 const generateClientId = async (): Promise<string> => {
   const currentYear = new Date().getFullYear();
@@ -264,8 +319,17 @@ const getAllUsers = async (
     "desc",
   );
 
-  const { searchTerm, roleName, isDeleted, startDate, endDate, ...filterData } =
-    filters;
+  const {
+    searchTerm,
+    roleName,
+    excludeRoleName,
+    hasAssignedCases,
+    hasActivityOnDate,
+    isDeleted,
+    startDate,
+    endDate,
+    ...filterData
+  } = filters;
   const andConditions: Prisma.UserWhereInput[] = [];
 
   // Default: exclude soft-deleted users unless explicitly requested
@@ -323,6 +387,49 @@ const getAllUsers = async (
     });
   }
 
+  // Exclude specific role if supplied (e.g. excludeRoleName=CLIENT for staff directory)
+  if (excludeRoleName) {
+    andConditions.push({
+      role: {
+        name: {
+          not: excludeRoleName,
+        },
+      },
+    });
+  }
+
+  // Filter by presence of assigned cases
+  if (hasAssignedCases !== undefined && hasAssignedCases !== null && hasAssignedCases !== "") {
+    const wantsCases = hasAssignedCases === true || hasAssignedCases === "true";
+    andConditions.push({
+      assignedCases: wantsCases
+        ? { some: { isDeleted: false } }
+        : { none: { isDeleted: false } },
+    });
+  }
+
+  // Filter by activity/shifts on the selected date range
+  if (
+    (hasActivityOnDate === true || hasActivityOnDate === "true") &&
+    (startDate || endDate)
+  ) {
+    const attWhere: Prisma.AttendanceWhereInput = { isDeleted: false };
+    attWhere.workDate = {};
+    if (startDate) {
+      const d = new Date(startDate);
+      attWhere.workDate.gte = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+    if (endDate) {
+      const d = new Date(endDate);
+      attWhere.workDate.lte = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    }
+    andConditions.push({
+      attendances: {
+        some: attWhere,
+      },
+    });
+  }
+
   // Filter by exact fields (roleId, status, email, country, etc.)
   if (Object.keys(filterData).length > 0) {
     andConditions.push({
@@ -343,7 +450,7 @@ const getAllUsers = async (
       skip,
       take: limit,
       orderBy,
-      select: safeUserSelect,
+      select: getUserListSelect(startDate, endDate),
     }),
     prisma.user.count({
       where: whereConditions,
