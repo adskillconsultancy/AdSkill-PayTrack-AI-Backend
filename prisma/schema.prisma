@@ -79,6 +79,11 @@ enum NotificationPriority {
   URGENT
 }
 
+enum AttendanceStatus {
+  CLOCKED_IN
+  CLOCKED_OUT
+}
+
 // ==================== MODELS ====================
 
 // Dynamic User Role model - supports future role expansion
@@ -188,6 +193,9 @@ model User {
   // Notification Relations
   notifications           Notification[]
   notificationPreference  NotificationPreference?
+
+  // Attendance Relations
+  attendances             Attendance[]
 
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
@@ -646,4 +654,48 @@ model EmailAuditLog {
 
   @@index([recipient, sentAt])
   @@map("email_audit_logs")
+}
+
+// ==================== ATTENDANCE TRACKER & AI DIGEST ====================
+
+model Attendance {
+  id           String           @id @default(uuid())
+  userId       String
+  workDate     DateTime         @db.Date
+  clockIn      DateTime
+  clockOut     DateTime?
+  totalMinutes Int?
+  status       AttendanceStatus @default(CLOCKED_IN)
+  currentFocus String?
+  eodNotes     String?          @db.Text
+
+  isDeleted    Boolean          @default(false)
+  deletedAt    DateTime?
+
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([userId, workDate])
+  @@index([workDate, status])
+  @@map("attendances")
+}
+
+model DailyAiDigest {
+  id                String    @id @default(uuid())
+  date              DateTime  @unique @db.Date
+  summaryContent    String    @db.Text
+  totalHoursLogged  Float     @default(0)
+  activeUsersCount  Int       @default(0)
+  paymentsCollected Float     @default(0)
+  metadata          Json?
+
+  isDeleted         Boolean   @default(false)
+  deletedAt         DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("daily_ai_digests")
 }

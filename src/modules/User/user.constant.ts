@@ -70,6 +70,12 @@ export const PERMISSIONS = {
 
   // Audit Log (Super Admin only)
   AUDIT_READ: "audit:read",
+
+  // Attendance Tracker & AI Digest (Universal PBAC)
+  ATTENDANCE_TRACK: "attendance:track",
+  ATTENDANCE_READ_SELF: "attendance:read-self",
+  ATTENDANCE_READ_ALL: "attendance:read-all",
+  ATTENDANCE_DIGEST_READ: "attendance:digest-read",
 } as const;
 
 export const userSearchableFields: string[] = [

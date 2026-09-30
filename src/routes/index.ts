@@ -19,6 +19,7 @@ import { SearchRoutes } from "../modules/Search/search.route";
 import { BackupRoutes } from "../modules/Backup/backup.route";
 
 import { NotificationRoutes } from "../modules/Notification/notification.route";
+import { AttendanceRoutes } from "../modules/Attendance/attendance.route";
 
 const router = Router();
 
@@ -98,6 +99,10 @@ const moduleRoutes = [
   {
     path: "/notifications",
     route: NotificationRoutes,
+  },
+  {
+    path: "/attendance",
+    route: AttendanceRoutes,
   },
 ];
 
