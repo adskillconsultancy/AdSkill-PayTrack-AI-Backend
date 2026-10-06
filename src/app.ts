@@ -14,6 +14,7 @@ const app: Application = express();
 const allowedOrigins = [
   config.client_url,
   "https://paytrack.adskillconsultancy.com",
+  "https://api.paytrack.adskillconsultancy.com",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:5174",
@@ -24,42 +25,27 @@ const corsOptions: cors.CorsOptions = {
     // Allow requests with no origin (e.g. mobile apps, curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
 
-    // Only allow explicit configured client URLs or exact AdSkill PayTrack deployments
-    const isExplicitAllowed = allowedOrigins.includes(origin);
-    const isProjectDeploy =
-      origin === "https://paytrack.adskillconsultancy.com" ||
-      /^https:\/\/([a-z0-9-]+\.)?adskillconsultancy\.com$/.test(origin);
+    const cleanOrigin = origin.trim().replace(/\/$/, "");
 
-    // F-16: Specific origin check even in non-production — allow localhost,
-    // Vercel preview deployments, or explicit allowed list. Never allow arbitrary origins.
+    const isExplicitAllowed = allowedOrigins.some(
+      (item) => item && item.trim().replace(/\/$/, "") === cleanOrigin,
+    );
+    const isAdSkillDomain =
+      /^https:\/\/([a-z0-9-]+\.)*adskillconsultancy\.com$/.test(cleanOrigin);
+    const isVercelPreview =
+      /^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(cleanOrigin);
     const isLocalDev =
       process.env.NODE_ENV !== "production" &&
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin);
 
-    const isVercelPreview =
-      /^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(origin);
-
-    if (
-      isExplicitAllowed ||
-      isProjectDeploy ||
-      isVercelPreview ||
-      isLocalDev
-    ) {
+    if (isExplicitAllowed || isAdSkillDomain || isVercelPreview || isLocalDev) {
       return callback(null, true);
     }
 
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+    return callback(null, false);
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-    "x-cron-secret",
-  ],
   optionsSuccessStatus: 204,
 };
 

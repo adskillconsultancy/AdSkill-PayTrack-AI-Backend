@@ -70,4 +70,10 @@ process.on("SIGINT", () => {
   exitHandler();
 });
 
-bootstrap();
+// In serverless environments (Vercel), Vercel invokes the exported app directly.
+// For traditional long-running environments (local dev / Docker / VPS), start the listener.
+if (process.env.VERCEL !== "1") {
+  bootstrap();
+}
+
+export default app;
