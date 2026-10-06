@@ -36,8 +36,17 @@ const updateClientCaseValidationSchema = z.object({
   }),
 });
 
+const cleanUuid = (msg: string) =>
+  z.string().transform((val) => {
+    try {
+      val = decodeURIComponent(val);
+    } catch {}
+    const match = val.match(/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/);
+    return match ? match[0] : val.replace(/^[a-zA-Z0-9_-]+(=|%3D)/, "").trim();
+  }).pipe(z.string().uuid(msg));
+
 const caseIdValidationSchema = z.object({
-  params: z.object({ id: z.string().uuid("Invalid case ID") }),
+  params: z.object({ id: cleanUuid("Invalid case ID") }),
 });
 
 export const ClientCaseValidation = {

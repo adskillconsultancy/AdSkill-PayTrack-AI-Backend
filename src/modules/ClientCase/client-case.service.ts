@@ -73,6 +73,24 @@ const caseSelect = {
       whatsapp: true,
     },
   },
+  paymentPlans: {
+    where: { isDeleted: false, isActive: true },
+    select: {
+      id: true,
+      currency: true,
+      contractedFee: true,
+    },
+    take: 1,
+    orderBy: { createdAt: "desc" },
+  },
+  payments: {
+    where: { isDeleted: false, status: "VERIFIED" },
+    select: {
+      id: true,
+      amount: true,
+      currency: true,
+    },
+  },
 } satisfies Prisma.ClientCaseSelect;
 
 type CaseWithRelations = Prisma.ClientCaseGetPayload<{ select: typeof caseSelect }>;

@@ -20,6 +20,8 @@ import { BackupRoutes } from "../modules/Backup/backup.route";
 
 import { NotificationRoutes } from "../modules/Notification/notification.route";
 import { AttendanceRoutes } from "../modules/Attendance/attendance.route";
+import { StripeRoutes } from "../modules/Stripe/stripe.route";
+
 
 const router = Router();
 
@@ -103,6 +105,10 @@ const moduleRoutes = [
   {
     path: "/attendance",
     route: AttendanceRoutes,
+  },
+  {
+    path: "/stripe",
+    route: StripeRoutes,
   },
 ];
 

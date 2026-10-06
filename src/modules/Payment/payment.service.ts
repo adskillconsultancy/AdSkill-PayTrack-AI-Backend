@@ -7,6 +7,8 @@ import { AuditService } from "../Audit/audit.service";
 import { NotificationService } from "../Notification/notification.service";
 import { PERMISSIONS } from "../User/user.constant";
 import { TCreatePaymentPayload, TPaymentFilters } from "./payment.interface";
+import { StripeService } from "../Stripe/stripe.service";
+
 
 const paymentInclude = {
   installment: { select: { id: true, sequenceNumber: true, title: true, amount: true, dueDate: true } },
@@ -85,18 +87,40 @@ const refreshFinancialStatus = async (tx: Prisma.TransactionClient, caseId: stri
     orderBy: { createdAt: "desc" },
     select: { contractedFee: true },
   });
-  if (!plan) return;
+
+  let targetFee = plan?.contractedFee;
+  if (!targetFee) {
+    const caseRec = await tx.clientCase.findUnique({
+      where: { id: caseId },
+      select: { service: { select: { baseFee: true } } },
+    });
+    targetFee = caseRec?.service?.baseFee;
+  }
+  if (!targetFee) return;
+
   const paid = await tx.payment.aggregate({
     where: { caseId, isDeleted: false, status: "VERIFIED" },
     _sum: { amount: true },
   });
   const total = paid._sum.amount ?? new Prisma.Decimal(0);
-  const status = total.gte(plan.contractedFee)
+  const status = total.gte(targetFee)
     ? "PAID"
     : total.gt(0)
       ? "PARTIALLY_PAID"
       : "UNPAID";
   await tx.clientCase.update({ where: { id: caseId }, data: { financialStatus: status } });
+
+  // If the case is settled in full, mark all remaining active installments as PAID
+  if (status === "PAID") {
+    await tx.installment.updateMany({
+      where: {
+        paymentPlan: { caseId },
+        isDeleted: false,
+        status: { not: "PAID" },
+      },
+      data: { status: "PAID" },
+    });
+  }
 };
 
 const refreshInstallmentStatus = async (tx: Prisma.TransactionClient, installmentId: string) => {
@@ -335,10 +359,34 @@ const refundPayment = async (
       const isFullRefund = refundDec.eq(payment.amount);
       const newStatus = isFullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED";
 
+      // ── Stripe Refund Path ─────────────────────────────────────────────────
+      // If the payment was made online via Stripe (stripeChargeId present),
+      // issue the refund through the Stripe Refunds API.
+      // The charge.refund.updated webhook will confirm the final status.
+      let stripeRefundId: string | undefined;
+      if ((payment as any).stripeChargeId) {
+        try {
+          const stripeRefund = await StripeService.createStripeRefund(
+            id,
+            payload.refundAmount,
+            payload.reason,
+            actorId,
+            actorEmail,
+          );
+          stripeRefundId = stripeRefund.id;
+        } catch (stripeErr: any) {
+          throw new AppError(
+            httpStatus.BAD_REQUEST,
+            `Stripe refund failed: ${stripeErr?.message || "Stripe API error"}`,
+          );
+        }
+      }
+
       const updatedRecord = await tx.payment.update({
         where: { id },
         data: {
           status: newStatus,
+          ...(stripeRefundId ? { stripeRefundId } : {}),
           operationalNotes: payment.operationalNotes
             ? `${payment.operationalNotes} | Refund of ${refundDec.toString()} ${payment.currency} processed: ${payload.reason}`
             : `Refund of ${refundDec.toString()} ${payment.currency} processed: ${payload.reason}`,

@@ -33,4 +33,9 @@ export default {
     from_name: process.env.EMAIL_FROM_NAME || "AdSkill PayTrack AI",
     from_email: process.env.EMAIL_FROM_ADDRESS || "notifications@adskillconsultancy.com",
   },
+  stripe: {
+    secret_key: process.env.STRIPE_SECRET_KEY || "",
+    publishable_key: process.env.STRIPE_PUBLISHABLE_KEY || "",
+    webhook_secret: process.env.STRIPE_WEBHOOK_SECRET || "",
+  },
 };

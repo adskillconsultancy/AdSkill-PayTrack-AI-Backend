@@ -385,6 +385,12 @@ model Payment {
   paymentMethod         String
   externalReference     String?
   stripePaymentIntentId String?
+  stripeChargeId        String?  // Stripe Charge ID (ch_xxx) — required for Stripe Refunds API
+  stripePaymentMethodId String?  // Stripe Payment Method ID (pm_xxx) — audit trail
+  stripeRefundId        String?  // Stripe Refund ID (re_xxx) when refund is processed via Stripe
+  stripeMetadata        Json?    // Flexible: last4, brand, exp_month, exp_year, funding, country
+  failureCode           String?  // Stripe decline code (e.g. card_declined, insufficient_funds)
+  failureMessage        String?  // Human-readable Stripe failure description
   idempotencyKey        String?
   status                String   @default("PENDING")
   verifiedById          String?
@@ -402,6 +408,7 @@ model Payment {
   @@index([caseId, isDeleted, paymentDate])
   @@index([installmentId, isDeleted])
   @@index([status, isDeleted])
+  @@index([stripePaymentIntentId])  // Fast webhook lookup by Stripe PI ID
   @@map("payments")
 }
 
@@ -515,6 +522,34 @@ model AuditLog {
   @@index([targetEntity, targetId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_logs")
+}
+
+// ==================== STRIPE WEBHOOK EVENT LOG ====================
+// Every Stripe webhook event is recorded here regardless of whether it is
+// processed or ignored. This table is the primary idempotency defense:
+// before processing any event, the handler checks if stripeEventId already
+// exists with status = "PROCESSED". If it does, the event is acknowledged
+// and skipped without any DB mutation.
+//
+// Status values:
+//   RECEIVED   — event arrived, processing started (or partial failure recovery)
+//   PROCESSED  — event fully handled, no further action needed
+//   IGNORED    — event type not handled (e.g. unknown event type)
+//   FAILED     — processing encountered an error (Stripe will retry)
+model StripeWebhookLog {
+  id              String    @id @default(uuid())
+  stripeEventId   String    @unique   // evt_xxx — Stripe's globally unique event ID
+  eventType       String               // e.g. "payment_intent.succeeded"
+  paymentIntentId String?              // pi_xxx (extracted from event.data.object)
+  status          String    @default("RECEIVED")  // RECEIVED | PROCESSED | IGNORED | FAILED
+  rawPayload      Json                 // Full Stripe event object for debugging and replay
+  errorMessage    String?              // Set when status = FAILED
+  processedAt     DateTime?            // Set when status = PROCESSED or IGNORED
+  createdAt       DateTime  @default(now())
+
+  @@index([paymentIntentId])
+  @@index([status, createdAt])
+  @@map("stripe_webhook_logs")
 }
 
 // ==================== SUPPORT & MESSAGING ====================
