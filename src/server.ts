@@ -9,13 +9,13 @@ let server: Server;
 async function bootstrap() {
   try {
     // ── Stripe environment checks ─────────────────────────────────────────────
-    if (config.stripe.secret_key.startsWith("sk_test_")) {
+    if (config.stripe?.secret_key?.startsWith("sk_test_")) {
       console.warn(
         "⚠️  [STRIPE_TEST_MODE] Test Stripe key (sk_test_*) detected. " +
         "Operating in Stripe Sandbox / Test mode. Live payments cannot be processed until set to sk_live_*.",
       );
     }
-    if (!config.stripe.webhook_secret) {
+    if (!config.stripe?.webhook_secret) {
       console.warn(
         "⚠️  [STRIPE_WARNING] STRIPE_WEBHOOK_SECRET is not configured. Webhook events cannot be verified.",
       );
@@ -30,8 +30,10 @@ async function bootstrap() {
       );
     });
 
-    // Start automated midnight backup scheduler
-    scheduleDailyMidnightBackup();
+    // Start automated midnight backup scheduler only in persistent server environments
+    if (process.env.VERCEL !== "1") {
+      scheduleDailyMidnightBackup();
+    }
   } catch (err) {
     console.error("Failed to start server:", err);
     process.exit(1);
@@ -70,10 +72,6 @@ process.on("SIGINT", () => {
   exitHandler();
 });
 
-// In serverless environments (Vercel), Vercel invokes the exported app directly.
-// For traditional long-running environments (local dev / Docker / VPS), start the listener.
-if (process.env.VERCEL !== "1") {
-  bootstrap();
-}
+bootstrap();
 
 export default app;
