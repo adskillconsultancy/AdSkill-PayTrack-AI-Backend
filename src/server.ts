@@ -8,6 +8,19 @@ let server: Server;
 
 async function bootstrap() {
   try {
+    // ── Stripe environment checks ─────────────────────────────────────────────
+    if (config.stripe.secret_key.startsWith("sk_test_")) {
+      console.warn(
+        "⚠️  [STRIPE_TEST_MODE] Test Stripe key (sk_test_*) detected. " +
+        "Operating in Stripe Sandbox / Test mode. Live payments cannot be processed until set to sk_live_*.",
+      );
+    }
+    if (!config.stripe.webhook_secret) {
+      console.warn(
+        "⚠️  [STRIPE_WARNING] STRIPE_WEBHOOK_SECRET is not configured. Webhook events cannot be verified.",
+      );
+    }
+
     server = app.listen(config.port, () => {
       console.log(
         `🚀 [AdSkill PayTrack AI Server] running on http://localhost:${config.port}`,

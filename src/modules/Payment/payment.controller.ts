@@ -29,7 +29,7 @@ const getPaymentById = catchAsync(async (req: Request, res: Response) => {
 });
 
 const verifyPayment = catchAsync(async (req: Request, res: Response) => {
-  const result = await PaymentService.verifyPayment(req.params.id, req.user!.id, req.user?.email);
+  const result = await PaymentService.verifyPayment(req.params.id, req.user!.id, req.user?.role, req.user?.email);
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Payment verified successfully", data: result });
 });
 

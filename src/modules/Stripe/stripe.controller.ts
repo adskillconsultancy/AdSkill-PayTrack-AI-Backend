@@ -48,7 +48,10 @@ const createPaymentIntent = catchAsync(async (req: Request, res: Response) => {
  */
 const createCheckoutSession = catchAsync(async (req: Request, res: Response) => {
   const { caseId, installmentId } = req.body;
-  const origin = req.headers.origin || config.client_url || "http://localhost:3000";
+  // F-02: Never use req.headers.origin for redirect URLs — it is attacker-controlled.
+  // A crafted Origin: https://evil.com header would cause Stripe to redirect back to
+  // the attacker's domain with the session_id and paymentId in the URL.
+  const origin = config.client_url;
 
   const result = await StripeService.createCheckoutSession(
     caseId,
@@ -123,9 +126,17 @@ const handleWebhook = async (req: Request, res: Response): Promise<void> => {
   }
 
   // 1. Verify Stripe signature — MUST use raw body Buffer, NOT parsed JSON
+  // F-05: Assert the body is a Buffer. The webhook route uses express.raw() so req.body
+  // IS the Buffer. If this ever fails it means middleware order was changed — fail loudly
+  // rather than silently accepting a parsed object that makes constructEvent() fail cryptically.
   let event: Stripe.Event;
   try {
-    const rawPayload = (req as any).rawBody || (req.body as Buffer);
+    const rawPayload = req.body;
+    if (!Buffer.isBuffer(rawPayload)) {
+      console.error("[STRIPE_WEBHOOK] Body is not a Buffer — express.raw() middleware may be misconfigured");
+      res.status(400).json({ success: false, message: "Invalid body format" });
+      return;
+    }
     event = stripe.webhooks.constructEvent(
       rawPayload,
       sig,

@@ -4,8 +4,11 @@ const createPaymentValidationSchema = z.object({
   body: z.object({
     caseId: z.string().uuid("Invalid case ID"),
     installmentId: z.string().uuid("Invalid installment ID").optional(),
+    // amount: Required for both CLIENT and STAFF. CLIENT partial payments are allowed —
+    // the server validates it does not exceed the installment target or remaining balance.
     amount: z.number().positive().finite(),
-    currency: z.string().trim().length(3).transform((value) => value.toUpperCase()),
+    // currency: optional for CLIENT (resolved from active plan); STAFF should supply it.
+    currency: z.string().trim().length(3).transform((value) => value.toUpperCase()).optional(),
     paymentDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
       message: "Invalid date format for paymentDate",
     }).optional(),

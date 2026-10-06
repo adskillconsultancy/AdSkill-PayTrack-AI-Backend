@@ -30,10 +30,20 @@ const corsOptions: cors.CorsOptions = {
       origin === "https://paytrack.adskillconsultancy.com" ||
       /^https:\/\/([a-z0-9-]+\.)?adskillconsultancy\.com$/.test(origin);
 
+    // F-16: Specific origin check even in non-production — allow localhost,
+    // Vercel preview deployments, or explicit allowed list. Never allow arbitrary origins.
+    const isLocalDev =
+      process.env.NODE_ENV !== "production" &&
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+    const isVercelPreview =
+      /^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(origin);
+
     if (
       isExplicitAllowed ||
       isProjectDeploy ||
-      process.env.NODE_ENV !== "production"
+      isVercelPreview ||
+      isLocalDev
     ) {
       return callback(null, true);
     }

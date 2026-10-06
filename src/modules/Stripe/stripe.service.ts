@@ -6,6 +6,11 @@ import prisma from "../../lib/prisma";
 import stripe from "../../lib/stripe";
 import { AuditService } from "../Audit/audit.service";
 import { NotificationService } from "../Notification/notification.service";
+import {
+  ensureCase,
+  refreshFinancialStatus,
+  refreshInstallmentStatus,
+} from "../../shared/payment.helpers";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -16,99 +21,6 @@ import { NotificationService } from "../Notification/notification.service";
  */
 const toCents = (amount: Prisma.Decimal | number): number => {
   return Math.round(Number(amount) * 100);
-};
-
-/**
- * Ensure the actor (client or staff) has access to the requested case.
- * Reuses the same ownership/assignment rules as the existing PaymentService.
- */
-const ensureCase = async (caseId: string, actorId: string, isStaff: boolean, userRole?: string) => {
-  const record = await prisma.clientCase.findFirst({
-    where: { id: caseId, isDeleted: false },
-    select: {
-      id: true,
-      userId: true,
-      assignedConsultantId: true,
-      financialStatus: true,
-    },
-  });
-  if (!record) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
-  if (!isStaff && record.userId !== actorId) {
-    throw new AppError(httpStatus.FORBIDDEN, "You cannot access this client case");
-  }
-  if (userRole === "CONSULTANT" && record.assignedConsultantId !== actorId) {
-    throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
-  }
-  return record;
-};
-
-/**
- * Recalculate and persist ClientCase.financialStatus based on verified payments
- * vs contracted fee. Identical logic to the existing PaymentService helper.
- */
-const refreshFinancialStatus = async (tx: Prisma.TransactionClient, caseId: string) => {
-  const plan = await tx.paymentPlan.findFirst({
-    where: { caseId, isDeleted: false, isActive: true },
-    orderBy: { createdAt: "desc" },
-    select: { contractedFee: true },
-  });
-
-  let targetFee = plan?.contractedFee;
-  if (!targetFee) {
-    const caseRec = await tx.clientCase.findUnique({
-      where: { id: caseId },
-      select: { service: { select: { baseFee: true } } },
-    });
-    targetFee = caseRec?.service?.baseFee;
-  }
-  if (!targetFee) return;
-
-  const paid = await tx.payment.aggregate({
-    where: { caseId, isDeleted: false, status: "VERIFIED" },
-    _sum: { amount: true },
-  });
-  const total = paid._sum.amount ?? new Prisma.Decimal(0);
-  const status = total.gte(targetFee)
-    ? "PAID"
-    : total.gt(0)
-      ? "PARTIALLY_PAID"
-      : "UNPAID";
-  await tx.clientCase.update({ where: { id: caseId }, data: { financialStatus: status } });
-
-  // If the case is settled in full, mark all remaining active installments as PAID
-  if (status === "PAID") {
-    await tx.installment.updateMany({
-      where: {
-        paymentPlan: { caseId },
-        isDeleted: false,
-        status: { not: "PAID" },
-      },
-      data: { status: "PAID" },
-    });
-  }
-};
-
-/**
- * Recalculate and persist Installment.status based on verified payments
- * on that installment. Identical logic to the existing PaymentService helper.
- */
-const refreshInstallmentStatus = async (tx: Prisma.TransactionClient, installmentId: string) => {
-  const inst = await tx.installment.findUnique({
-    where: { id: installmentId },
-    select: { id: true, amount: true },
-  });
-  if (!inst) return;
-  const paidAgg = await tx.payment.aggregate({
-    where: { installmentId, isDeleted: false, status: "VERIFIED" },
-    _sum: { amount: true },
-  });
-  const totalPaid = paidAgg._sum.amount ?? new Prisma.Decimal(0);
-  const status = totalPaid.gte(inst.amount)
-    ? "PAID"
-    : totalPaid.gt(0)
-      ? "PARTIALLY_PAID"
-      : "PENDING";
-  await tx.installment.update({ where: { id: installmentId }, data: { status } });
 };
 
 // ─── Create Payment Intent ────────────────────────────────────────────────────
@@ -144,67 +56,16 @@ const createPaymentIntent = async (
   }
 
   const currency = plan.currency.toLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+  const idempotencyKey = `stripe-pi-${caseId}-${installmentId || "full"}-${today}`;
 
-  // 3. Compute the amount server-side
-  let amountDecimal: Prisma.Decimal;
-
-  // Check overall remaining balance on the case
-  const paidOnCase = await prisma.payment.aggregate({
-    where: { caseId, isDeleted: false, status: "VERIFIED" },
-    _sum: { amount: true },
-  });
-  const alreadyPaidOnCase = paidOnCase._sum.amount ?? new Prisma.Decimal(0);
-  const caseRemaining = plan.contractedFee.sub(alreadyPaidOnCase);
-
-  if (caseRemaining.lte(0)) {
-    throw new AppError(httpStatus.BAD_REQUEST, "This case agreement has already been paid in full");
-  }
-
-  if (installmentId) {
-    // Pay a specific installment: use the installment amount minus already-verified payments
-    const installment = await prisma.installment.findFirst({
-      where: { id: installmentId, isDeleted: false, paymentPlan: { caseId } },
-      select: { id: true, amount: true, status: true },
-    });
-    if (!installment) {
-      throw new AppError(httpStatus.BAD_REQUEST, "Installment does not belong to this case");
-    }
-    if (installment.status === "PAID") {
-      throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been paid");
-    }
-    // Remaining = installment.amount - sum of verified payments on this installment
-    const paidOnInstallment = await prisma.payment.aggregate({
-      where: { installmentId, isDeleted: false, status: "VERIFIED" },
-      _sum: { amount: true },
-    });
-    const alreadyPaid = paidOnInstallment._sum.amount ?? new Prisma.Decimal(0);
-    amountDecimal = installment.amount.sub(alreadyPaid);
-    amountDecimal = Prisma.Decimal.min(amountDecimal, caseRemaining);
-    if (amountDecimal.lte(0)) {
-      throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been fully paid");
-    }
-  } else {
-    // Pay remaining balance: contractedFee - total verified payments on case
-    amountDecimal = caseRemaining;
-  }
-
-  // 4. Generate a stable idempotency key for this payment attempt
-  const idempotencyKey = `stripe-pi-${caseId}-${installmentId || "case"}-${Date.now()}`;
-
-  // 5. Create the DB payment record (STRIPE_PENDING) inside a transaction
-  const paymentRecord = await prisma.$transaction(
+  // 3 & 4 & 5. F-07: Compute amount and create STRIPE_PENDING record inside an atomic transaction
+  // Prevents concurrent requests from reading stale balance and double-charging.
+  const { paymentRecord, amountDecimal, reusedIntent } = await prisma.$transaction(
     async (tx) => {
-      return tx.payment.create({
-        data: {
-          caseId,
-          installmentId: installmentId || null,
-          amount: amountDecimal,
-          currency: plan.currency.toUpperCase(),
-          paymentMethod: "STRIPE_ONLINE",
-          paymentDate: new Date(),
-          idempotencyKey,
-          status: "STRIPE_PENDING",
-        },
+      // Check if an existing STRIPE_PENDING record already exists for this idempotency key
+      const existing = await tx.payment.findUnique({
+        where: { idempotencyKey },
         select: {
           id: true,
           caseId: true,
@@ -212,6 +73,7 @@ const createPaymentIntent = async (
           amount: true,
           currency: true,
           status: true,
+          stripePaymentIntentId: true,
           idempotencyKey: true,
           case: {
             select: {
@@ -223,9 +85,131 @@ const createPaymentIntent = async (
           },
         },
       });
+
+      if (existing && existing.status === "STRIPE_PENDING" && existing.stripePaymentIntentId) {
+        return { paymentRecord: existing, amountDecimal: existing.amount, reusedIntent: true };
+      }
+
+      // Check overall remaining balance on the case inside transaction
+      const paidOnCase = await tx.payment.aggregate({
+        where: { caseId, isDeleted: false, status: "VERIFIED" },
+        _sum: { amount: true },
+      });
+      const alreadyPaidOnCase = paidOnCase._sum.amount ?? new Prisma.Decimal(0);
+      const caseRemaining = plan.contractedFee.sub(alreadyPaidOnCase);
+
+      if (caseRemaining.lte(0)) {
+        throw new AppError(httpStatus.BAD_REQUEST, "This case agreement has already been paid in full");
+      }
+
+      let targetAmount: Prisma.Decimal;
+      if (installmentId) {
+        const installment = await tx.installment.findFirst({
+          where: { id: installmentId, isDeleted: false, paymentPlan: { caseId } },
+          select: { id: true, amount: true, status: true },
+        });
+        if (!installment) {
+          throw new AppError(httpStatus.BAD_REQUEST, "Installment does not belong to this case");
+        }
+        if (installment.status === "PAID") {
+          throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been paid");
+        }
+        const paidOnInstallment = await tx.payment.aggregate({
+          where: { installmentId, isDeleted: false, status: "VERIFIED" },
+          _sum: { amount: true },
+        });
+        const alreadyPaid = paidOnInstallment._sum.amount ?? new Prisma.Decimal(0);
+        targetAmount = installment.amount.sub(alreadyPaid);
+        targetAmount = Prisma.Decimal.min(targetAmount, caseRemaining);
+        if (targetAmount.lte(0)) {
+          throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been fully paid");
+        }
+      } else {
+        targetAmount = caseRemaining;
+      }
+
+      let created;
+      try {
+        created = await tx.payment.create({
+          data: {
+            caseId,
+            installmentId: installmentId || null,
+            amount: targetAmount,
+            currency: plan.currency.toUpperCase(),
+            paymentMethod: "STRIPE_ONLINE",
+            paymentDate: new Date(),
+            idempotencyKey,
+            status: "STRIPE_PENDING",
+          },
+          select: {
+            id: true,
+            caseId: true,
+            installmentId: true,
+            amount: true,
+            currency: true,
+            status: true,
+            stripePaymentIntentId: true,
+            idempotencyKey: true,
+            case: {
+              select: {
+                caseCode: true,
+                userId: true,
+                assignedConsultantId: true,
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        });
+      } catch (e: any) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+          const coll = await tx.payment.findUnique({
+            where: { idempotencyKey },
+            select: {
+              id: true,
+              caseId: true,
+              installmentId: true,
+              amount: true,
+              currency: true,
+              status: true,
+              stripePaymentIntentId: true,
+              idempotencyKey: true,
+              case: {
+                select: {
+                  caseCode: true,
+                  userId: true,
+                  assignedConsultantId: true,
+                  user: { select: { id: true, name: true, email: true } },
+                },
+              },
+            },
+          });
+          if (coll) return { paymentRecord: coll, amountDecimal: coll.amount, reusedIntent: true };
+        }
+        throw e;
+      }
+
+      return { paymentRecord: created, amountDecimal: targetAmount, reusedIntent: false };
     },
     { maxWait: 10000, timeout: 25000 },
   );
+
+  // If reusing a pending intent that already has a Stripe PaymentIntent, return it
+  if (reusedIntent && paymentRecord.stripePaymentIntentId) {
+    try {
+      const existingPI = await stripe.paymentIntents.retrieve(paymentRecord.stripePaymentIntentId);
+      if (existingPI.status !== "canceled" && existingPI.client_secret) {
+        return {
+          paymentId: paymentRecord.id,
+          clientSecret: existingPI.client_secret,
+          amount: Number(amountDecimal),
+          currency: plan.currency.toUpperCase(),
+          stripePaymentIntentId: existingPI.id,
+        };
+      }
+    } catch {
+      // If retrieval fails or status was cancelled, proceed to create fresh PaymentIntent below
+    }
+  }
 
   // 6. Create the Stripe PaymentIntent (after DB record exists so we have the paymentId)
   let paymentIntent: Stripe.PaymentIntent;
@@ -253,10 +237,13 @@ const createPaymentIntent = async (
     // Roll back the DB payment record if Stripe PI creation fails
     await prisma.payment.delete({ where: { id: paymentRecord.id } }).catch(() => {});
     console.error("[STRIPE_ERROR] Failed to create PaymentIntent:", stripeError?.message);
-    throw new AppError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      `Failed to initialize payment: ${stripeError?.message || "Stripe API error"}`,
-    );
+    // F-18: Never expose raw Stripe error messages to the client — they may contain
+    // API version details or internal codes useful to attackers. Log server-side only.
+    const userMessage =
+      stripeError?.type === "StripeCardError"
+        ? "Your card was declined. Please try a different payment method."
+        : "Unable to initialize payment. Please try again or contact support.";
+    throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, userMessage);
   }
 
   // 7. Update the DB payment record with the Stripe PaymentIntent ID
@@ -325,72 +312,24 @@ const createCheckoutSession = async (
   }
 
   const currency = plan.currency.toLowerCase();
+  // F-12: Stable idempotency key per day (removed Date.now())
+  const today = new Date().toISOString().slice(0, 10);
+  const idempotencyKey = `stripe-cs-${caseId}-${installmentId || "case"}-${today}`;
 
-  // 3. Compute amount server-side
-  let amountDecimal: Prisma.Decimal;
-  let installmentTitle = "";
-
-  // Check overall remaining balance on the case
-  const paidOnCase = await prisma.payment.aggregate({
-    where: { caseId, isDeleted: false, status: "VERIFIED" },
-    _sum: { amount: true },
-  });
-  const alreadyPaidOnCase = paidOnCase._sum.amount ?? new Prisma.Decimal(0);
-  const caseRemaining = plan.contractedFee.sub(alreadyPaidOnCase);
-
-  if (caseRemaining.lte(0)) {
-    throw new AppError(httpStatus.BAD_REQUEST, "This case agreement has already been paid in full");
-  }
-
-  if (installmentId) {
-    const installment = await prisma.installment.findFirst({
-      where: { id: installmentId, isDeleted: false, paymentPlan: { caseId } },
-      select: { id: true, amount: true, status: true, title: true, sequenceNumber: true },
-    });
-    if (!installment) {
-      throw new AppError(httpStatus.BAD_REQUEST, "Installment does not belong to this case");
-    }
-    if (installment.status === "PAID") {
-      throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been paid");
-    }
-    const paidOnInstallment = await prisma.payment.aggregate({
-      where: { installmentId, isDeleted: false, status: "VERIFIED" },
-      _sum: { amount: true },
-    });
-    const alreadyPaid = paidOnInstallment._sum.amount ?? new Prisma.Decimal(0);
-    amountDecimal = installment.amount.sub(alreadyPaid);
-    amountDecimal = Prisma.Decimal.min(amountDecimal, caseRemaining);
-    if (amountDecimal.lte(0)) {
-      throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been fully paid");
-    }
-    installmentTitle = installment.title || `Installment #${installment.sequenceNumber}`;
-  } else {
-    amountDecimal = caseRemaining;
-  }
-
-  // 4. Generate stable idempotency key
-  const idempotencyKey = `stripe-cs-${caseId}-${installmentId || "case"}-${Date.now()}`;
-
-  // 5. Create pending payment record
-  const paymentRecord = await prisma.$transaction(
+  // 3 & 4 & 5. F-07: Compute amount and create STRIPE_PENDING record inside an atomic transaction
+  const { paymentRecord, amountDecimal, installmentTitle, reusedSession } = await prisma.$transaction(
     async (tx) => {
-      return tx.payment.create({
-        data: {
-          caseId,
-          installmentId: installmentId || null,
-          amount: amountDecimal,
-          currency: plan.currency.toUpperCase(),
-          paymentMethod: "STRIPE_CHECKOUT",
-          paymentDate: new Date(),
-          idempotencyKey,
-          status: "STRIPE_PENDING",
-        },
+      // Check for existing pending session
+      const existing = await tx.payment.findUnique({
+        where: { idempotencyKey },
         select: {
           id: true,
           caseId: true,
           installmentId: true,
           amount: true,
           currency: true,
+          status: true,
+          stripePaymentIntentId: true,
           case: {
             select: {
               caseCode: true,
@@ -401,9 +340,149 @@ const createCheckoutSession = async (
           },
         },
       });
+
+      if (existing && existing.status === "STRIPE_PENDING" && existing.stripePaymentIntentId) {
+        return {
+          paymentRecord: existing,
+          amountDecimal: existing.amount,
+          installmentTitle: "",
+          reusedSession: true,
+        };
+      }
+
+      // Check overall remaining balance on the case
+      const paidOnCase = await tx.payment.aggregate({
+        where: { caseId, isDeleted: false, status: "VERIFIED" },
+        _sum: { amount: true },
+      });
+      const alreadyPaidOnCase = paidOnCase._sum.amount ?? new Prisma.Decimal(0);
+      const caseRemaining = plan.contractedFee.sub(alreadyPaidOnCase);
+
+      if (caseRemaining.lte(0)) {
+        throw new AppError(httpStatus.BAD_REQUEST, "This case agreement has already been paid in full");
+      }
+
+      let targetAmount: Prisma.Decimal;
+      let title = "";
+
+      if (installmentId) {
+        const installment = await tx.installment.findFirst({
+          where: { id: installmentId, isDeleted: false, paymentPlan: { caseId } },
+          select: { id: true, amount: true, status: true, title: true, sequenceNumber: true },
+        });
+        if (!installment) {
+          throw new AppError(httpStatus.BAD_REQUEST, "Installment does not belong to this case");
+        }
+        if (installment.status === "PAID") {
+          throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been paid");
+        }
+        const paidOnInstallment = await tx.payment.aggregate({
+          where: { installmentId, isDeleted: false, status: "VERIFIED" },
+          _sum: { amount: true },
+        });
+        const alreadyPaid = paidOnInstallment._sum.amount ?? new Prisma.Decimal(0);
+        targetAmount = installment.amount.sub(alreadyPaid);
+        targetAmount = Prisma.Decimal.min(targetAmount, caseRemaining);
+        if (targetAmount.lte(0)) {
+          throw new AppError(httpStatus.BAD_REQUEST, "This installment has already been fully paid");
+        }
+        title = installment.title || `Installment #${installment.sequenceNumber}`;
+      } else {
+        targetAmount = caseRemaining;
+      }
+
+      let created;
+      try {
+        created = await tx.payment.create({
+          data: {
+            caseId,
+            installmentId: installmentId || null,
+            amount: targetAmount,
+            currency: plan.currency.toUpperCase(),
+            paymentMethod: "STRIPE_CHECKOUT",
+            paymentDate: new Date(),
+            idempotencyKey,
+            status: "STRIPE_PENDING",
+          },
+          select: {
+            id: true,
+            caseId: true,
+            installmentId: true,
+            amount: true,
+            currency: true,
+            status: true,
+            stripePaymentIntentId: true,
+            case: {
+              select: {
+                caseCode: true,
+                serviceNameSnapshot: true,
+                userId: true,
+                user: { select: { id: true, name: true, email: true } },
+              },
+            },
+          },
+        });
+      } catch (e: any) {
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+          const coll = await tx.payment.findUnique({
+            where: { idempotencyKey },
+            select: {
+              id: true,
+              caseId: true,
+              installmentId: true,
+              amount: true,
+              currency: true,
+              status: true,
+              stripePaymentIntentId: true,
+              case: {
+                select: {
+                  caseCode: true,
+                  serviceNameSnapshot: true,
+                  userId: true,
+                  user: { select: { id: true, name: true, email: true } },
+                },
+              },
+            },
+          });
+          if (coll) {
+            return {
+              paymentRecord: coll,
+              amountDecimal: coll.amount,
+              installmentTitle: "",
+              reusedSession: true,
+            };
+          }
+        }
+        throw e;
+      }
+
+      return {
+        paymentRecord: created,
+        amountDecimal: targetAmount,
+        installmentTitle: title,
+        reusedSession: false,
+      };
     },
     { maxWait: 10000, timeout: 25000 },
   );
+
+  // If reusing a pending session that is still open on Stripe, return its URL
+  if (reusedSession && paymentRecord.stripePaymentIntentId) {
+    try {
+      const existingSession = await stripe.checkout.sessions.retrieve(paymentRecord.stripePaymentIntentId);
+      if (existingSession.status === "open" && existingSession.url) {
+        return {
+          paymentId: paymentRecord.id,
+          url: existingSession.url,
+          sessionId: existingSession.id,
+          amount: Number(amountDecimal),
+          currency: plan.currency.toUpperCase(),
+        };
+      }
+    } catch {
+      // If retrieval fails or session expired, proceed with fresh checkout session below
+    }
+  }
 
   // 6. Create Stripe Checkout Session
   let session: Stripe.Checkout.Session;
@@ -439,9 +518,10 @@ const createCheckoutSession = async (
   } catch (stripeError: any) {
     await prisma.payment.delete({ where: { id: paymentRecord.id } }).catch(() => {});
     console.error("[STRIPE_ERROR] Failed to create Checkout Session:", stripeError?.message);
+    // F-18: Sanitize error message to client
     throw new AppError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      `Failed to initialize Stripe Checkout: ${stripeError?.message || "Stripe API error"}`,
+      "Unable to initialize Stripe Checkout. Please try again or contact support.",
     );
   }
 
@@ -538,6 +618,17 @@ const handleWebhookEvent = async (event: Stripe.Event, webhookLogId: string): Pr
         break;
       case "charge.refund.updated":
         await handleChargeRefundUpdated(event.data.object as unknown as Stripe.Refund);
+        break;
+      // F-09: Handle chargeback events. When a client disputes a charge, Stripe withdraws
+      // the funds from the merchant. Without handling this, the payment stays VERIFIED and
+      // the case stays PAID — client gets the service for free.
+      case "charge.dispute.created":
+      case "charge.dispute.funds_withdrawn":
+        await handleChargeDisputeCreated(event.data.object as Stripe.Dispute);
+        break;
+      case "charge.dispute.closed":
+      case "charge.dispute.funds_reinstated":
+        await handleChargeDisputeClosed(event.data.object as Stripe.Dispute);
         break;
       default:
         // Log but do not error on unknown event types — Stripe sends many event types
@@ -640,7 +731,7 @@ const handleCheckoutSessionCompleted = async (session: Stripe.Checkout.Session):
 
   console.log(`[STRIPE_WEBHOOK] Payment ${payment.id} verified via checkout.session.completed`);
 
-  NotificationService.dispatchPaymentVerifiedNotification(payment as any).catch((err) => {
+  NotificationService.dispatchPaymentVerifiedNotification(payment as any).catch((err: any) => {
     console.error("[NOTIFICATION] Failed to dispatch payment verified notification:", err?.message);
   });
 
@@ -761,7 +852,7 @@ const handlePaymentIntentSucceeded = async (pi: Stripe.PaymentIntent): Promise<v
     receiptNumber: `STRIPE-${paymentId.slice(0, 8).toUpperCase()}`,
     verifierName: "Stripe Payment System",
     assignedConsultantId: existingPayment.case.assignedConsultantId,
-  }).catch((err) => console.error("[NOTIFICATION_ERROR] Stripe success notification:", err));
+  }).catch((err: any) => console.error("[NOTIFICATION_ERROR] Stripe success notification:", err));
 };
 
 /**
@@ -903,10 +994,14 @@ const handleChargeRefundUpdated = async (refund: Stripe.Refund): Promise<void> =
     return;
   }
 
-  // Determine refund status based on the refund amount vs payment amount
-  const refundAmountDollars = refund.amount / 100;
-  const isFullRefund = new Prisma.Decimal(refundAmountDollars).gte(payment.amount);
+  // F-11: Compare in integer cents to avoid JavaScript floating-point imprecision.
+  // e.g. 1230 / 100 = 12.299999... in JS, which would misclassify a full $12.30
+  // refund as PARTIALLY_REFUNDED.
+  const refundCents = refund.amount; // already an integer from Stripe
+  const paymentCents = Math.round(Number(payment.amount) * 100);
+  const isFullRefund = refundCents >= paymentCents;
   const newStatus = isFullRefund ? "REFUNDED" : "PARTIALLY_REFUNDED";
+  const refundAmountDollars = (refund.amount / 100).toFixed(2);
 
   await prisma.$transaction(
     async (tx) => {
@@ -943,7 +1038,101 @@ const handleChargeRefundUpdated = async (refund: Stripe.Refund): Promise<void> =
   });
 };
 
-// ─── Create Stripe Refund ─────────────────────────────────────────────────────
+// ─── Dispute / Chargeback Handlers (F-09) ────────────────────────────────────
+
+/**
+ * charge.dispute.created | charge.dispute.funds_withdrawn
+ * A client has initiated a chargeback. Stripe withdraws the funds immediately.
+ * Mark the payment DISPUTED and refresh financial status so the case is no
+ * longer shown as PAID — the client cannot receive service for free.
+ */
+const handleChargeDisputeCreated = async (dispute: Stripe.Dispute): Promise<void> => {
+  const chargeId = typeof dispute.charge === "string" ? dispute.charge : (dispute.charge as any)?.id;
+  if (!chargeId) return;
+
+  const payment = await prisma.payment.findFirst({
+    where: { stripeChargeId: chargeId, isDeleted: false },
+    select: { id: true, caseId: true, installmentId: true, amount: true, currency: true },
+  });
+  if (!payment) {
+    console.warn(`[STRIPE_WEBHOOK] charge.dispute.created: no payment found for charge ${chargeId}`);
+    return;
+  }
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: "DISPUTED",
+          operationalNotes: `Chargeback opened (dispute: ${dispute.id}). Amount: ${dispute.amount / 100} ${dispute.currency.toUpperCase()}. Reason: ${dispute.reason}.`,
+        },
+      });
+      if (payment.installmentId) {
+        await refreshInstallmentStatus(tx, payment.installmentId);
+      }
+      await refreshFinancialStatus(tx, payment.caseId);
+    },
+    { maxWait: 10000, timeout: 25000 },
+  );
+
+  // Alert staff immediately — this is a revenue loss event
+  console.error(`[STRIPE_DISPUTE] ⚠️  Chargeback opened on payment ${payment.id} (charge ${chargeId}). Dispute: ${dispute.id}. Amount: ${dispute.amount / 100} ${dispute.currency.toUpperCase()}`);
+
+  AuditService.writeAuditLog({
+    action: "STRIPE_DISPUTE_CREATED",
+    targetEntity: "Payment",
+    targetId: payment.id,
+    afterValue: { status: "DISPUTED", disputeId: dispute.id, chargeId, reason: dispute.reason, amount: dispute.amount },
+  });
+};
+
+/**
+ * charge.dispute.closed | charge.dispute.funds_reinstated
+ * The dispute was resolved — either won (funds reinstated) or lost (funds gone).
+ * If won: revert to VERIFIED and restore financial status.
+ * If lost: keep DISPUTED so staff can see the outcome.
+ */
+const handleChargeDisputeClosed = async (dispute: Stripe.Dispute): Promise<void> => {
+  const chargeId = typeof dispute.charge === "string" ? dispute.charge : (dispute.charge as any)?.id;
+  if (!chargeId) return;
+
+  const payment = await prisma.payment.findFirst({
+    where: { stripeChargeId: chargeId, isDeleted: false },
+    select: { id: true, caseId: true, installmentId: true },
+  });
+  if (!payment) return;
+
+  const won = dispute.status === "won";
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: won ? "VERIFIED" : "DISPUTED",
+          operationalNotes: `Dispute ${dispute.id} closed: ${dispute.status}. ${won ? "Funds reinstated." : "Funds lost to chargeback."}`,
+        },
+      });
+      if (payment.installmentId) {
+        await refreshInstallmentStatus(tx, payment.installmentId);
+      }
+      await refreshFinancialStatus(tx, payment.caseId);
+    },
+    { maxWait: 10000, timeout: 25000 },
+  );
+
+  console.log(`[STRIPE_DISPUTE] Dispute ${dispute.id} closed with status "${dispute.status}" for payment ${payment.id}`);
+
+  AuditService.writeAuditLog({
+    action: "STRIPE_DISPUTE_CLOSED",
+    targetEntity: "Payment",
+    targetId: payment.id,
+    afterValue: { disputeStatus: dispute.status, disputeId: dispute.id, paymentStatus: won ? "VERIFIED" : "DISPUTED" },
+  });
+};
+
+
 
 /**
  * Issues a refund via the Stripe Refunds API for a Stripe-originated payment.
