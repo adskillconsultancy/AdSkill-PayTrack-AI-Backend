@@ -541,12 +541,127 @@ const createCheckoutSession = async (
 };
 
 
+// ─── Self-Healing Sync with Stripe API ────────────────────────────────────────
+
+/**
+ * Self-healing sync: directly queries Stripe API to verify payment state
+ * if a webhook was missed, delayed, or not forwarded (e.g. during local development).
+ * Cascades status to installment and case ledger automatically.
+ */
+const syncAndVerifyPaymentWithStripe = async (paymentId: string): Promise<boolean> => {
+  const payment = await prisma.payment.findUnique({
+    where: { id: paymentId },
+    select: {
+      id: true,
+      status: true,
+      stripePaymentIntentId: true,
+      caseId: true,
+      installmentId: true,
+      amount: true,
+      currency: true,
+      case: {
+        select: {
+          caseCode: true,
+          userId: true,
+        },
+      },
+    },
+  });
+
+  if (!payment || payment.status === "VERIFIED" || !payment.stripePaymentIntentId) {
+    return false;
+  }
+
+  if (!["STRIPE_PENDING", "PENDING", "STRIPE_PROCESSING", "STRIPE_ACTION_REQUIRED"].includes(payment.status)) {
+    return false;
+  }
+
+  try {
+    // 1. If it's a Checkout Session (starts with cs_)
+    if (payment.stripePaymentIntentId.startsWith("cs_")) {
+      const session = await stripe.checkout.sessions.retrieve(payment.stripePaymentIntentId);
+      if (session.payment_status === "paid" || session.status === "complete") {
+        const paymentIntentId =
+          typeof session.payment_intent === "string"
+            ? session.payment_intent
+            : (session.payment_intent as any)?.id || null;
+
+        await prisma.$transaction(
+          async (tx) => {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: {
+                status: "VERIFIED",
+                ...(paymentIntentId ? { stripePaymentIntentId: paymentIntentId } : {}),
+                stripeMetadata: (session.customer_details as unknown as Prisma.InputJsonValue) || undefined,
+              },
+            });
+
+            if (payment.installmentId) {
+              await refreshInstallmentStatus(tx, payment.installmentId);
+            }
+            await refreshFinancialStatus(tx, payment.caseId);
+          },
+          { maxWait: 10000, timeout: 25000 },
+        );
+
+        NotificationService.dispatchPaymentVerifiedNotification(payment as any).catch(() => {});
+        AuditService.writeAuditLog({
+          actorId: session.metadata?.actorId || payment.case.userId,
+          action: "STRIPE_CHECKOUT_AUTO_SYNC_VERIFIED",
+          targetEntity: "Payment",
+          targetId: payment.id,
+          afterValue: { status: "VERIFIED", checkoutSessionId: session.id, paymentIntentId },
+        });
+
+        return true;
+      }
+    }
+
+    // 2. If it's a Payment Intent (starts with pi_)
+    if (payment.stripePaymentIntentId.startsWith("pi_")) {
+      const pi = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+      if (pi.status === "succeeded") {
+        await prisma.$transaction(
+          async (tx) => {
+            await tx.payment.update({
+              where: { id: payment.id },
+              data: { status: "VERIFIED" },
+            });
+
+            if (payment.installmentId) {
+              await refreshInstallmentStatus(tx, payment.installmentId);
+            }
+            await refreshFinancialStatus(tx, payment.caseId);
+          },
+          { maxWait: 10000, timeout: 25000 },
+        );
+
+        NotificationService.dispatchPaymentVerifiedNotification(payment as any).catch(() => {});
+        AuditService.writeAuditLog({
+          actorId: pi.metadata?.actorId || payment.case.userId,
+          action: "STRIPE_PI_AUTO_SYNC_VERIFIED",
+          targetEntity: "Payment",
+          targetId: payment.id,
+          afterValue: { status: "VERIFIED", paymentIntentId: pi.id },
+        });
+
+        return true;
+      }
+    }
+  } catch (err: any) {
+    console.warn(`[STRIPE_AUTO_SYNC] Failed to sync payment ${paymentId}:`, err?.message);
+  }
+
+  return false;
+};
+
 // ─── Get Payment Intent Status ────────────────────────────────────────────────
 
 /**
  * Returns the current status of a Stripe payment from our DB.
  * Used by the frontend to poll after a redirect or payment confirmation.
- * Does NOT call the Stripe API — avoids unnecessary API calls.
+ * Runs self-healing sync if the payment is still marked pending.
  */
 const getPaymentIntentStatus = async (
   paymentId: string,
@@ -554,6 +669,9 @@ const getPaymentIntentStatus = async (
   isStaff: boolean,
   userRole?: string,
 ) => {
+  // Self-healing: if Stripe already collected funds, sync immediately
+  await syncAndVerifyPaymentWithStripe(paymentId);
+
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, isDeleted: false },
     select: {
@@ -1205,4 +1323,5 @@ export const StripeService = {
   getPaymentIntentStatus,
   handleWebhookEvent,
   createStripeRefund,
+  syncAndVerifyPaymentWithStripe,
 };

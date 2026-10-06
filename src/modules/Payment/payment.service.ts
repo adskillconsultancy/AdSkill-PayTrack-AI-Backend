@@ -540,11 +540,23 @@ const refundPayment = async (
 };
 
 const getPaymentById = async (id: string, actorId: string, staff: boolean, userRole?: string) => {
-  const payment = await prisma.payment.findFirst({ where: { id, isDeleted: false }, include: paymentInclude });
+  let payment = await prisma.payment.findFirst({ where: { id, isDeleted: false }, include: paymentInclude });
   if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
   if (!staff && payment.case.userId !== actorId) throw new AppError(httpStatus.FORBIDDEN, "You cannot access this payment");
   if (userRole === "CONSULTANT" && payment.case.assignedConsultantId !== actorId) {
     throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
+  }
+
+  // Self-healing: if Stripe payment is still pending/unverified, verify directly via Stripe API
+  if (
+    (payment.status === "STRIPE_PENDING" || payment.status === "PENDING" || payment.status === "STRIPE_PROCESSING") &&
+    payment.stripePaymentIntentId
+  ) {
+    const synced = await StripeService.syncAndVerifyPaymentWithStripe(payment.id);
+    if (synced) {
+      payment = await prisma.payment.findFirst({ where: { id, isDeleted: false }, include: paymentInclude });
+      if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
+    }
   }
 
   const proofDocumentsWithUrls = await Promise.all(
@@ -635,7 +647,7 @@ const getAllPayments = async (
     AND: andConditions,
   };
 
-  const [payments, verifiedAgg, pendingCount, verifiedCount] = await Promise.all([
+  let [payments, verifiedAgg, pendingCount, verifiedCount] = await Promise.all([
     prisma.payment.findMany({
       where: whereCondition,
       include: paymentInclude,
@@ -661,6 +673,29 @@ const getAllPayments = async (
       },
     }),
   ]);
+
+  // Self-healing: if any Stripe payments are pending in the current view, check Stripe directly
+  const pendingStripePayments = payments.filter(
+    (p) =>
+      (p.status === "STRIPE_PENDING" || p.status === "PENDING" || p.status === "STRIPE_PROCESSING") &&
+      Boolean(p.stripePaymentIntentId),
+  );
+  if (pendingStripePayments.length > 0) {
+    let anySynced = false;
+    await Promise.allSettled(
+      pendingStripePayments.map(async (p) => {
+        const synced = await StripeService.syncAndVerifyPaymentWithStripe(p.id);
+        if (synced) anySynced = true;
+      }),
+    );
+    if (anySynced) {
+      payments = await prisma.payment.findMany({
+        where: whereCondition,
+        include: paymentInclude,
+        orderBy: [{ recordedAt: "desc" }, { paymentDate: "desc" }],
+      });
+    }
+  }
 
   // Today volume
   const todayStart = new Date();

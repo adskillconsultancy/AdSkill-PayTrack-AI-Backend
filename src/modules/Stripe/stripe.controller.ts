@@ -131,9 +131,9 @@ const handleWebhook = async (req: Request, res: Response): Promise<void> => {
   // rather than silently accepting a parsed object that makes constructEvent() fail cryptically.
   let event: Stripe.Event;
   try {
-    const rawPayload = req.body;
-    if (!Buffer.isBuffer(rawPayload)) {
-      console.error("[STRIPE_WEBHOOK] Body is not a Buffer — express.raw() middleware may be misconfigured");
+    const rawPayload = (req as any).rawBody || (Buffer.isBuffer(req.body) ? req.body : undefined);
+    if (!rawPayload || !Buffer.isBuffer(rawPayload)) {
+      console.error("[STRIPE_WEBHOOK] Body is not a Buffer — express.raw() or rawBody middleware may be misconfigured");
       res.status(400).json({ success: false, message: "Invalid body format" });
       return;
     }
