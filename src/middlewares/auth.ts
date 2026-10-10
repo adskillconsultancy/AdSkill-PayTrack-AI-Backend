@@ -20,23 +20,25 @@ import catchAsync from "../shared/catchAsync";
  */
 const auth = (...requiredPermissions: string[]) => {
   return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    let token: string | undefined;
+
     const authHeader = req.headers.authorization;
+    if (authHeader) {
+      token = authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : authHeader;
+    } else if (req.query?.token && typeof req.query.token === "string") {
+      token = req.query.token;
+    } else if (req.cookies?.accessToken) {
+      token = req.cookies.accessToken;
+    }
 
     // Check token presence
-    if (!authHeader) {
+    if (!token) {
       throw new AppError(
         httpStatus.UNAUTHORIZED,
         "Authentication token required",
       );
-    }
-
-    // Support standard Bearer token format
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.split(" ")[1]
-      : authHeader;
-
-    if (!token) {
-      throw new AppError(httpStatus.UNAUTHORIZED, "Invalid token format");
     }
 
     // Verify token

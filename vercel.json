@@ -5,10 +5,19 @@
       "src": "src/server.ts",
       "use": "@vercel/node",
       "config": {
-        "maxDuration": 60
+        "maxDuration": 60,
+        "includeFiles": [
+          "node_modules/pdfkit/**"
+        ]
       }
     }
   ],
+  "functions": {
+    "src/server.ts": {
+      "includeFiles": "node_modules/pdfkit/**",
+      "maxDuration": 60
+    }
+  },
   "routes": [
     {
       "src": "/(.*)",

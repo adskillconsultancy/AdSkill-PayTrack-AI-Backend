@@ -1,5 +1,19 @@
 import PDFDocument from "pdfkit";
 
+// Explicitly require PDFKit standard fonts so @vercel/nft traces and bundles them on Vercel/serverless
+try {
+  require("pdfkit/standard-fonts/Helvetica");
+  require("pdfkit/standard-fonts/HelveticaBold");
+  require("pdfkit/standard-fonts/HelveticaOblique");
+  require("pdfkit/standard-fonts/HelveticaBoldOblique");
+  require("pdfkit/standard-fonts/TimesRoman");
+  require("pdfkit/standard-fonts/TimesBold");
+  require("pdfkit/standard-fonts/Courier");
+  require("pdfkit/standard-fonts/CourierBold");
+} catch {
+  // Gracefully ignored if handled by default runtime loader
+}
+
 // ─── AdSkill Branding Constants ──────────────────────────────────────────────
 export const ADSKILL = {
   legalName: "AdSkill Consultancy Inc.",
