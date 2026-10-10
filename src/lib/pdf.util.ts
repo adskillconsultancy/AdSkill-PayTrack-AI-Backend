@@ -1,18 +1,24 @@
-import PDFDocument from "pdfkit";
+import path from "path";
+import PDFDocumentOriginal from "pdfkit";
 
-// Explicitly require PDFKit standard fonts so @vercel/nft traces and bundles them on Vercel/serverless
+// Use standalone PDFKit bundle with inlined fonts to eliminate Vercel serverless missing-font runtime crashes
+let PDFDocumentClass: any = PDFDocumentOriginal;
 try {
-  require("pdfkit/standard-fonts/Helvetica");
-  require("pdfkit/standard-fonts/HelveticaBold");
-  require("pdfkit/standard-fonts/HelveticaOblique");
-  require("pdfkit/standard-fonts/HelveticaBoldOblique");
-  require("pdfkit/standard-fonts/TimesRoman");
-  require("pdfkit/standard-fonts/TimesBold");
-  require("pdfkit/standard-fonts/Courier");
-  require("pdfkit/standard-fonts/CourierBold");
+  const standalonePath = path.join(
+    path.dirname(require.resolve("pdfkit")),
+    "pdfkit.standalone.js"
+  );
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const StandaloneDoc = require(standalonePath);
+  if (StandaloneDoc) {
+    PDFDocumentClass = StandaloneDoc;
+  }
 } catch {
-  // Gracefully ignored if handled by default runtime loader
+  PDFDocumentClass = PDFDocumentOriginal;
 }
+
+const PDFDocument = PDFDocumentClass;
+type PDFDocType = any;
 
 // ─── AdSkill Branding Constants ──────────────────────────────────────────────
 export const ADSKILL = {
