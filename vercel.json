@@ -14,12 +14,7 @@
       }
     }
   ],
-  "functions": {
-    "src/server.ts": {
-      "includeFiles": "node_modules/pdfkit/**",
-      "maxDuration": 60
-    }
-  },
+
   "routes": [
     {
       "src": "/(.*)",
