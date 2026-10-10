@@ -1,24 +1,14 @@
-import path from "path";
-import PDFDocumentOriginal from "pdfkit";
-
-// Use standalone PDFKit bundle with inlined fonts to eliminate Vercel serverless missing-font runtime crashes
-let PDFDocumentClass: any = PDFDocumentOriginal;
+// Use standalone PDFKit bundle (all standard fonts inlined in JS memory)
+// IMPORTANT: Use a local relative file require so @vercel/nft traces and bundles it on Vercel
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+let PDFDocument: typeof import("pdfkit");
 try {
-  const standalonePath = path.join(
-    path.dirname(require.resolve("pdfkit")),
-    "pdfkit.standalone.js"
-  );
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const StandaloneDoc = require(standalonePath);
-  if (StandaloneDoc) {
-    PDFDocumentClass = StandaloneDoc;
-  }
+  PDFDocument = require("./pdfkit.standalone.js");
 } catch {
-  PDFDocumentClass = PDFDocumentOriginal;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  PDFDocument = require("pdfkit");
 }
-
-const PDFDocument = PDFDocumentClass;
-type PDFDocType = any;
 
 // ─── AdSkill Branding Constants ──────────────────────────────────────────────
 export const ADSKILL = {
