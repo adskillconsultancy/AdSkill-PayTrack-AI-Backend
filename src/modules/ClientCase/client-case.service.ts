@@ -71,6 +71,7 @@ const caseSelect = {
       email: true,
       phone: true,
       whatsapp: true,
+      role: { select: { id: true, name: true } },
     },
   },
   paymentPlans: {
