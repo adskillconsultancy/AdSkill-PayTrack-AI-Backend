@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -93,3 +94,18 @@ export const deletePrivateObject = async (key: string) => {
     }),
   );
 };
+
+export const listPrivateObjects = async (prefix?: string) => {
+  const { bucket } = getR2Config();
+  const client = createR2Client();
+
+  const res = await client.send(
+    new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix,
+    }),
+  );
+
+  return res.Contents || [];
+};
+

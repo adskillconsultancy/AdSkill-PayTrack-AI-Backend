@@ -4,14 +4,22 @@ import path from "path";
 dotenv.config({ path: path.join(process.cwd(), ".env") });
 
 // ── JWT Secret resolution with safety warning ────────────────────────────────
-const access_secret = process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "dev_secret";
-const refresh_secret = process.env.JWT_REFRESH_SECRET || process.env.JWT_REFRESH_TOKEN_SECRET || "dev_refresh_secret";
+const access_secret =
+  process.env.JWT_ACCESS_SECRET || process.env.JWT_SECRET || "dev_secret";
+const refresh_secret =
+  process.env.JWT_REFRESH_SECRET ||
+  process.env.JWT_REFRESH_TOKEN_SECRET ||
+  "dev_refresh_secret";
 
 if (!process.env.JWT_ACCESS_SECRET) {
-  console.warn("⚠️  [SECURITY WARNING] JWT_ACCESS_SECRET is not set in environment variables. Using dev fallback secret.");
+  console.warn(
+    "⚠️  [SECURITY WARNING] JWT_ACCESS_SECRET is not set in environment variables. Using dev fallback secret.",
+  );
 }
 if (!process.env.JWT_REFRESH_SECRET) {
-  console.warn("⚠️  [SECURITY WARNING] JWT_REFRESH_SECRET is not set in environment variables. Using dev fallback secret.");
+  console.warn(
+    "⚠️  [SECURITY WARNING] JWT_REFRESH_SECRET is not set in environment variables. Using dev fallback secret.",
+  );
 }
 
 export default {
@@ -42,7 +50,8 @@ export default {
     user: process.env.SMTP_USER || "",
     pass: process.env.SMTP_PASS || "",
     from_name: process.env.EMAIL_FROM_NAME || "AdSkill PayTrack AI",
-    from_email: process.env.EMAIL_FROM_ADDRESS || "notifications@adskillconsultancy.com",
+    from_email:
+      process.env.EMAIL_FROM_ADDRESS || "notifications@adskillconsultancy.com",
   },
   stripe: {
     secret_key: process.env.STRIPE_SECRET_KEY || "",

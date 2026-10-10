@@ -1,6 +1,10 @@
 import zlib from "zlib";
 import prisma from "../../lib/prisma";
-import { uploadPrivateObject, getPrivateObjectSignedUrl } from "../../lib/r2";
+import {
+  uploadPrivateObject,
+  getPrivateObjectSignedUrl,
+  listPrivateObjects,
+} from "../../lib/r2";
 import { UPLOAD_FOLDERS } from "../Upload/upload.constant";
 
 export interface IBackupResult {
@@ -74,6 +78,27 @@ export const runDatabaseBackup = async (): Promise<IBackupResult> => {
     ORDER BY table_name ASC;
   `;
 
+  // Fetch tables in concurrent batches of 5 to minimize latency while staying well within pool limits
+  const BATCH_SIZE = 5;
+  const tableDataMap: Record<string, Record<string, unknown>[]> = {};
+
+  for (let i = 0; i < tables.length; i += BATCH_SIZE) {
+    const batch = tables.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async ({ table_name }) => {
+        try {
+          const rows = (await prisma.$queryRawUnsafe(
+            `SELECT * FROM "public"."${table_name}"`,
+          )) as Record<string, unknown>[];
+          tableDataMap[table_name] = rows || [];
+        } catch (tableErr) {
+          console.warn(`[BackupService] Warning: Could not dump table ${table_name}:`, tableErr);
+          tableDataMap[table_name] = [];
+        }
+      }),
+    );
+  }
+
   let totalRows = 0;
   const sqlChunks: string[] = [];
 
@@ -91,34 +116,27 @@ export const runDatabaseBackup = async (): Promise<IBackupResult> => {
   );
 
   for (const { table_name } of tables) {
-    try {
-      const rows = (await prisma.$queryRawUnsafe(
-        `SELECT * FROM "public"."${table_name}"`,
-      )) as Record<string, unknown>[];
+    const rows = tableDataMap[table_name] || [];
 
-      if (!rows || rows.length === 0) {
-        sqlChunks.push(`-- Table: "${table_name}" (0 rows)\n`);
-        continue;
-      }
-
-      totalRows += rows.length;
-      sqlChunks.push(`-- Table: "${table_name}" (${rows.length} rows)`);
-
-      const columns = Object.keys(rows[0]);
-      const quotedCols = columns.map((col) => `"${col}"`).join(", ");
-
-      const valueRows = rows.map((row) => {
-        const values = columns.map((col) => escapeSqlValue(row[col]));
-        return `  (${values.join(", ")})`;
-      });
-
-      sqlChunks.push(
-        `INSERT INTO "public"."${table_name}" (${quotedCols}) VALUES\n${valueRows.join(",\n")};\n`,
-      );
-    } catch (tableErr) {
-      console.warn(`[BackupService] Warning: Could not dump table ${table_name}:`, tableErr);
-      sqlChunks.push(`-- Warning: Failed to dump table "${table_name}"\n`);
+    if (!rows || rows.length === 0) {
+      sqlChunks.push(`-- Table: "${table_name}" (0 rows)\n`);
+      continue;
     }
+
+    totalRows += rows.length;
+    sqlChunks.push(`-- Table: "${table_name}" (${rows.length} rows)`);
+
+    const columns = Object.keys(rows[0]);
+    const quotedCols = columns.map((col) => `"${col}"`).join(", ");
+
+    const valueRows = rows.map((row) => {
+      const values = columns.map((col) => escapeSqlValue(row[col]));
+      return `  (${values.join(", ")})`;
+    });
+
+    sqlChunks.push(
+      `INSERT INTO "public"."${table_name}" (${quotedCols}) VALUES\n${valueRows.join(",\n")};\n`,
+    );
   }
 
   sqlChunks.push(
@@ -180,3 +198,41 @@ export const runDatabaseBackup = async (): Promise<IBackupResult> => {
     createdAt: now.toISOString(),
   };
 };
+
+export const listDatabaseBackups = async () => {
+  const objects = await listPrivateObjects(UPLOAD_FOLDERS.BACKUPS);
+
+  const backupObjects = objects.filter(
+    (obj) => obj.Key && obj.Key.endsWith(".sql.gz"),
+  );
+
+  // Sort newest first
+  backupObjects.sort((a, b) => {
+    const timeA = a.LastModified ? new Date(a.LastModified).getTime() : 0;
+    const timeB = b.LastModified ? new Date(b.LastModified).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  const results = await Promise.all(
+    backupObjects.map(async (obj) => {
+      let signedUrl: string | undefined;
+      try {
+        signedUrl = await getPrivateObjectSignedUrl(obj.Key!, 3600); // 1-hour valid link
+      } catch {
+        // signed url is optional
+      }
+
+      return {
+        key: obj.Key!,
+        fileName: obj.Key!.split("/").pop(),
+        size: formatBytes(obj.Size || 0),
+        sizeBytes: obj.Size || 0,
+        lastModified: obj.LastModified ? new Date(obj.LastModified).toISOString() : null,
+        signedDownloadUrl: signedUrl,
+      };
+    }),
+  );
+
+  return results;
+};
+
