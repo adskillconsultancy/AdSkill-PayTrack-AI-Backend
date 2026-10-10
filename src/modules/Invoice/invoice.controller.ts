@@ -44,4 +44,28 @@ const getAllInvoices = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Invoices retrieved successfully", data });
 });
 
-export const InvoiceController = { generateInvoice, listInvoices, getAllInvoices, getInvoice, downloadInvoicePdf };
+const downloadCaseInvoicePdf = catchAsync(async (req: Request, res: Response) => {
+  const { buffer, invoiceNumber } = await InvoiceService.generateCaseInvoicePdf(
+    req.params.caseId,
+    req.user!.id,
+    staff(req),
+    req.user?.role,
+    req.user?.email
+  );
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="${invoiceNumber}.pdf"`,
+    "Content-Length": buffer.length,
+    "Cache-Control": "no-store",
+  });
+  res.send(buffer);
+});
+
+export const InvoiceController = {
+  generateInvoice,
+  listInvoices,
+  getAllInvoices,
+  getInvoice,
+  downloadInvoicePdf,
+  downloadCaseInvoicePdf,
+};

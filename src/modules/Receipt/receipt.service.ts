@@ -126,6 +126,15 @@ const createReceipt = async (paymentId: string, actorId: string, userRole?: stri
     throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
 
+  // Idempotent check: if a receipt already exists for this payment, return it directly
+  const existingReceipt = await prisma.receipt.findFirst({
+    where: { paymentId, isDeleted: false },
+    include,
+  });
+  if (existingReceipt) {
+    return existingReceipt;
+  }
+
   const receipt = await prisma.$transaction(
     async (tx) => {
       const receiptNumber = await nextReceiptNumber(tx);
@@ -335,4 +344,41 @@ const generateReceiptPdf = async (id: string, actorId: string, staff: boolean, u
   return streamToBuffer(doc);
 };
 
-export const ReceiptService = { createReceipt, listReceipts, getAllReceipts, getReceipt, generateReceiptPdf };
+// ─── Generate Receipt PDF directly from Payment ID ────────────────────────────
+const generatePaymentReceiptPdf = async (
+  paymentId: string,
+  actorId: string,
+  staff: boolean,
+  userRole?: string,
+  actorEmail?: string
+): Promise<{ buffer: Buffer; receiptNumber: string }> => {
+  const payment = await prisma.payment.findFirst({
+    where: { id: paymentId, isDeleted: false },
+    select: { id: true, caseId: true, status: true },
+  });
+  if (!payment) throw new AppError(httpStatus.NOT_FOUND, "Payment not found");
+
+  let rct = await prisma.receipt.findFirst({
+    where: { paymentId, isDeleted: false },
+    include,
+  });
+
+  if (!rct) {
+    if (payment.status !== "VERIFIED") {
+      throw new AppError(httpStatus.BAD_REQUEST, "Payment must be verified before receipt can be generated");
+    }
+    rct = await createReceipt(paymentId, actorId, userRole, actorEmail);
+  }
+
+  const buffer = await generateReceiptPdf(rct.id, actorId, staff, userRole, actorEmail);
+  return { buffer, receiptNumber: rct.receiptNumber };
+};
+
+export const ReceiptService = {
+  createReceipt,
+  listReceipts,
+  getAllReceipts,
+  getReceipt,
+  generateReceiptPdf,
+  generatePaymentReceiptPdf,
+};

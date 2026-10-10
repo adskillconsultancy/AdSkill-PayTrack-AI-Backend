@@ -25,6 +25,12 @@ router.get(
   ReceiptController.listReceipts
 );
 router.get(
+  "/payments/:paymentId/pdf",
+  auth(PERMISSIONS.RECEIPT_READ),
+  validateRequest(ReceiptValidation.paymentReceiptValidationSchema),
+  ReceiptController.downloadPaymentReceiptPdf
+);
+router.get(
   "/:id/pdf",
   auth(PERMISSIONS.RECEIPT_READ),
   validateRequest(ReceiptValidation.receiptIdValidationSchema),

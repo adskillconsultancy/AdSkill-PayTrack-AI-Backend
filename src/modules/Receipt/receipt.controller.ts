@@ -44,4 +44,28 @@ const getAllReceipts = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, { statusCode: httpStatus.OK, success: true, message: "Receipts retrieved successfully", data });
 });
 
-export const ReceiptController = { createReceipt, listReceipts, getAllReceipts, getReceipt, downloadReceiptPdf };
+const downloadPaymentReceiptPdf = catchAsync(async (req: Request, res: Response) => {
+  const { buffer, receiptNumber } = await ReceiptService.generatePaymentReceiptPdf(
+    req.params.paymentId,
+    req.user!.id,
+    staff(req),
+    req.user?.role,
+    req.user?.email
+  );
+  res.set({
+    "Content-Type": "application/pdf",
+    "Content-Disposition": `inline; filename="${receiptNumber}.pdf"`,
+    "Content-Length": buffer.length,
+    "Cache-Control": "no-store",
+  });
+  res.send(buffer);
+});
+
+export const ReceiptController = {
+  createReceipt,
+  listReceipts,
+  getAllReceipts,
+  getReceipt,
+  downloadReceiptPdf,
+  downloadPaymentReceiptPdf,
+};

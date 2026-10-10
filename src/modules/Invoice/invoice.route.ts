@@ -25,6 +25,12 @@ router.get(
   InvoiceController.listInvoices
 );
 router.get(
+  "/cases/:caseId/pdf",
+  auth(PERMISSIONS.INVOICE_READ),
+  validateRequest(InvoiceValidation.caseInvoiceValidationSchema),
+  InvoiceController.downloadCaseInvoicePdf
+);
+router.get(
   "/:id/pdf",
   auth(PERMISSIONS.INVOICE_READ),
   validateRequest(InvoiceValidation.invoiceIdValidationSchema),

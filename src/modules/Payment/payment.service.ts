@@ -69,6 +69,19 @@ const paymentInclude = {
       createdAt: true,
     },
   },
+  receipts: {
+    where: { isDeleted: false },
+    select: {
+      id: true,
+      receiptNumber: true,
+      amount: true,
+      currency: true,
+      status: true,
+      issuedAt: true,
+    },
+    take: 1,
+    orderBy: { issuedAt: "desc" as const },
+  },
 };
 
 // Maximum percentage a STAFF-submitted amount may exceed the remaining balance (e.g. 5 = 5%)

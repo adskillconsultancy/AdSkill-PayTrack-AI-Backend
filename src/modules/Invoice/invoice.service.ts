@@ -351,4 +351,35 @@ const generateInvoicePdf = async (id: string, actorId: string, staff: boolean, u
   return streamToBuffer(doc);
 };
 
-export const InvoiceService = { generateInvoice, listInvoices, getAllInvoices, getInvoice, generateInvoicePdf };
+// ─── Generate Invoice PDF directly from Case ID ──────────────────────────────
+const generateCaseInvoicePdf = async (
+  caseId: string,
+  actorId: string,
+  staff: boolean,
+  userRole?: string,
+  actorEmail?: string
+): Promise<{ buffer: Buffer; invoiceNumber: string }> => {
+  await access(caseId, actorId, staff, userRole);
+
+  let inv = await prisma.invoice.findFirst({
+    where: { caseId, isDeleted: false },
+    orderBy: { issuedAt: "desc" },
+    include,
+  });
+
+  if (!inv) {
+    inv = await generateInvoice(caseId, actorId, userRole, actorEmail);
+  }
+
+  const buffer = await generateInvoicePdf(inv.id, actorId, staff, userRole, actorEmail);
+  return { buffer, invoiceNumber: inv.invoiceNumber };
+};
+
+export const InvoiceService = {
+  generateInvoice,
+  listInvoices,
+  getAllInvoices,
+  getInvoice,
+  generateInvoicePdf,
+  generateCaseInvoicePdf,
+};

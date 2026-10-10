@@ -3,9 +3,9 @@ import httpStatus from "http-status";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import config from "../config";
 import AppError from "../errors/AppError";
+import { TAuthUser } from "../interface";
 import prisma from "../lib/prisma";
 import catchAsync from "../shared/catchAsync";
-import { TAuthUser } from "../interface";
 
 /**
  * Permission-Based Access Control (PBAC) Authentication & Authorization Middleware
