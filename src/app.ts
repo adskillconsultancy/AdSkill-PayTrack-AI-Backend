@@ -32,8 +32,11 @@ const corsOptions: cors.CorsOptions = {
     );
     const isAdSkillDomain =
       /^https:\/\/([a-z0-9-]+\.)*adskillconsultancy\.com$/.test(cleanOrigin);
+    // F-04: Restrict Vercel preview domains to this project only; prevents arbitrary *.vercel.app sites from accessing the API with credentials
     const isVercelPreview =
-      /^https:\/\/[a-z0-9-]+(\.vercel\.app)$/.test(cleanOrigin);
+      /^https:\/\/(adskill-paytrack|adskill|paytrack)[a-z0-9-]*\.vercel\.app$/.test(
+        cleanOrigin,
+      );
     const isLocalDev =
       process.env.NODE_ENV !== "production" &&
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin);

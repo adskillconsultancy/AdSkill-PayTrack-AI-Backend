@@ -45,7 +45,16 @@ const auth = (...requiredPermissions: string[]) => {
     const decoded = jwt.verify(
       token,
       config.jwt.access_secret as string,
-    ) as JwtPayload & TAuthUser;
+    ) as JwtPayload & TAuthUser & { pendingMfa?: boolean; type?: string };
+
+    // F-01 & F-02: Prevent token purpose confusion & MFA bypass
+    // Intermediate MFA challenge tokens and Password Reset tokens must never be used as session access tokens
+    if (decoded.pendingMfa || decoded.type === "PASSWORD_RESET") {
+      throw new AppError(
+        httpStatus.UNAUTHORIZED,
+        "Invalid token: Token is not authorized for session access",
+      );
+    }
 
     const { id } = decoded;
 

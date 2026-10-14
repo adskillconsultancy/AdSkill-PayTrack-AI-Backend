@@ -207,7 +207,7 @@ const generateAccessToken = (payload: {
     expiresIn: config.jwt.access_expires_in as SignOptions["expiresIn"],
   };
   return jwt.sign(
-    payload,
+    { ...payload, type: "ACCESS" },
     config.jwt.access_secret as string,
     accessSignOptions
   );
