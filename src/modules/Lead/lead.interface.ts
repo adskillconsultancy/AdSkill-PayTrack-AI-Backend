@@ -12,6 +12,7 @@ export interface TCreateLeadPayload {
   assignedToId?: string;
   createdById?: string;
   createdByName?: string;
+  nextFollowUpDate?: string | Date;
 }
 
 export interface TUpdateLeadPayload {
@@ -24,6 +25,8 @@ export interface TUpdateLeadPayload {
   referralName?: string;
   status?: LeadStatus;
   assignedToId?: string | null;
+  nextFollowUpDate?: string | Date | null;
+  isFollowUpDone?: boolean;
 }
 
 export interface TCreateLeadActivityPayload {
@@ -34,6 +37,7 @@ export interface TCreateLeadActivityPayload {
   statusUpdate?: LeadStatus;
   performedById?: string;
   performedByName?: string;
+  isFollowUpDone?: boolean;
 }
 
 export interface TLeadFilterRequest {
@@ -44,4 +48,17 @@ export interface TLeadFilterRequest {
   country?: string;
   startDate?: string;
   endDate?: string;
+  isFollowUpDone?: boolean;
+}
+
+export interface TFollowUpFilterRequest {
+  urgency?: "OVERDUE" | "TODAY" | "UPCOMING" | "COMPLETED" | "ALL";
+  assignedToId?: string;
+  searchTerm?: string;
+}
+
+export interface TCompleteFollowUpPayload {
+  notes?: string;
+  outcome?: string;
+  nextFollowUpDate?: string | Date;
 }

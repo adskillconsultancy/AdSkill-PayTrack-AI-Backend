@@ -3,6 +3,7 @@ import app from "./app";
 import config from "./config";
 import prisma from "./lib/prisma";
 import { scheduleDailyMidnightBackup } from "./modules/Backup/backup.scheduler";
+import { scheduleLeadFollowUpReminders } from "./modules/Lead/leadReminder.scheduler";
 
 let server: Server;
 
@@ -30,9 +31,10 @@ async function bootstrap() {
       );
     });
 
-    // Start automated midnight backup scheduler only in persistent server environments
+    // Start background automated schedulers only in persistent server environments
     if (process.env.VERCEL !== "1") {
       scheduleDailyMidnightBackup();
+      scheduleLeadFollowUpReminders();
     }
   } catch (err) {
     console.error("Failed to start server:", err);

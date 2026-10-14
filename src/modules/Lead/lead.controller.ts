@@ -103,12 +103,60 @@ const deleteLead = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getLeadSummaryStats = catchAsync(async (req: Request, res: Response) => {
-  const result = await LeadService.getLeadSummaryStats();
+  const user = req.user ? { id: req.user.id, role: req.user.role } : undefined;
+  const result = await LeadService.getLeadSummaryStats(user);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
     message: "Lead summary statistics retrieved successfully",
+    data: result,
+  });
+});
+
+const getFollowUpQueue = catchAsync(async (req: Request, res: Response) => {
+  const user = {
+    id: req.user!.id,
+    role: req.user?.role,
+  };
+
+  const filters = {
+    urgency: req.query.urgency as "OVERDUE" | "TODAY" | "UPCOMING" | "ALL" | undefined,
+    assignedToId: req.query.assignedToId as string | undefined,
+    searchTerm: (req.query.searchTerm || req.query.search) as string | undefined,
+  };
+
+  const paginationOptions = {
+    page: req.query.page as string | undefined,
+    limit: req.query.limit as string | undefined,
+  };
+
+  const result = await LeadService.getFollowUpQueue(user, filters, paginationOptions);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Lead follow-up queue retrieved successfully",
+    meta: result.meta,
+    data: {
+      items: result.data,
+      counts: result.counts,
+    },
+  });
+});
+
+const completeFollowUp = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const user = req.user
+    ? { id: req.user.id, name: req.user.name || req.user.email, email: req.user.email }
+    : undefined;
+
+  const result = await LeadService.completeFollowUp(id, req.body, user);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Lead follow-up marked as completed",
     data: result,
   });
 });
@@ -121,4 +169,6 @@ export const LeadController = {
   addLeadActivity,
   deleteLead,
   getLeadSummaryStats,
+  getFollowUpQueue,
+  completeFollowUp,
 };

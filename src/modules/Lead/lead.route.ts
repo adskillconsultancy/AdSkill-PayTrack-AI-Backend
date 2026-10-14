@@ -30,21 +30,36 @@ router.get(
   LeadController.getLeadSummaryStats,
 );
 
-// 4. Get all leads with filtering & pagination
+// 4. Follow-up reminder queue (Urgent-First, Staff-Scoped)
+router.get(
+  "/follow-ups",
+  auth(),
+  LeadController.getFollowUpQueue,
+);
+
+// 5. Get all leads with filtering & pagination
 router.get(
   "/",
   auth(),
   LeadController.getAllLeads,
 );
 
-// 5. Get single lead details with timeline
+// 6. Complete lead follow-up
+router.patch(
+  "/:id/complete-follow-up",
+  auth(),
+  validateRequest(LeadValidation.completeFollowUpZodSchema),
+  LeadController.completeFollowUp,
+);
+
+// 7. Get single lead details with timeline
 router.get(
   "/:id",
   auth(),
   LeadController.getLeadById,
 );
 
-// 6. Update lead
+// 8. Update lead
 router.patch(
   "/:id",
   auth(),
@@ -52,7 +67,7 @@ router.patch(
   LeadController.updateLead,
 );
 
-// 7. Add lead activity log (calls, WhatsApp, meeting, note)
+// 9. Add lead activity log (calls, WhatsApp, meeting, note)
 router.post(
   "/:id/activities",
   auth(),

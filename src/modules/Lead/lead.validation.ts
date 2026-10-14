@@ -17,6 +17,7 @@ const createLeadZodSchema = z.object({
     status: leadStatusEnum.optional(),
     assignedToId: z.string().uuid("Invalid staff ID").optional().or(z.literal("")),
     createdByName: z.string().optional(),
+    nextFollowUpDate: z.string().optional().nullable(),
   }),
 });
 
@@ -31,6 +32,8 @@ const updateLeadZodSchema = z.object({
     referralName: z.string().optional().nullable(),
     status: leadStatusEnum.optional(),
     assignedToId: z.string().uuid().optional().nullable().or(z.literal("")),
+    nextFollowUpDate: z.string().optional().nullable(),
+    isFollowUpDone: z.boolean().optional(),
   }),
 });
 
@@ -43,6 +46,15 @@ const createLeadActivityZodSchema = z.object({
     statusUpdate: leadStatusEnum.optional().nullable(),
     performedById: z.string().uuid().optional().nullable(),
     performedByName: z.string().optional().nullable(),
+    isFollowUpDone: z.boolean().optional(),
+  }),
+});
+
+const completeFollowUpZodSchema = z.object({
+  body: z.object({
+    notes: z.string().optional().nullable(),
+    outcome: z.string().optional().nullable(),
+    nextFollowUpDate: z.string().optional().nullable(),
   }),
 });
 
@@ -56,5 +68,6 @@ export const LeadValidation = {
   createLeadZodSchema,
   updateLeadZodSchema,
   createLeadActivityZodSchema,
+  completeFollowUpZodSchema,
   assignLeadZodSchema,
 };

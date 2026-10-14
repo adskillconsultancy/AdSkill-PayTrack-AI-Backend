@@ -101,6 +101,7 @@ enum LeadActivityType {
   MEETING
   NOTE
   STATUS_CHANGE
+  FOLLOW_UP_COMPLETED
 }
 
 enum CallOutcome {
@@ -795,6 +796,12 @@ model Lead {
   isDeleted       Boolean      @default(false)
   deletedAt       DateTime?
 
+  // Follow-up & Reminder fields
+  nextFollowUpDate   DateTime?
+  lastFollowUpAt     DateTime?
+  isFollowUpDone     Boolean      @default(false)
+  followUpNotifiedAt DateTime?
+
   activities      LeadActivity[]
 
   createdAt       DateTime     @default(now())
@@ -803,6 +810,7 @@ model Lead {
   @@index([status, isDeleted])
   @@index([assignedToId])
   @@index([serviceId])
+  @@index([nextFollowUpDate, isFollowUpDone])
   @@map("leads")
 }
 
@@ -815,6 +823,8 @@ model LeadActivity {
   callOutcome     CallOutcome?
   notes           String?          @db.Text
   nextFollowUp    DateTime?
+  isFollowUpDone  Boolean          @default(false)
+  remindedAt      DateTime?
 
   performedById   String?
   performedBy     User?            @relation(fields: [performedById], references: [id], onDelete: SetNull)
