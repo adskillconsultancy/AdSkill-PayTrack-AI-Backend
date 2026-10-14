@@ -84,6 +84,34 @@ enum AttendanceStatus {
   CLOCKED_OUT
 }
 
+enum LeadStatus {
+  NEW
+  CONTACTED
+  IN_PROGRESS
+  FOLLOW_UP
+  QUALIFIED
+  CONVERTED
+  LOST
+}
+
+enum LeadActivityType {
+  CALL
+  WHATSAPP
+  EMAIL
+  MEETING
+  NOTE
+  STATUS_CHANGE
+}
+
+enum CallOutcome {
+  ANSWERED
+  NO_ANSWER
+  BUSY
+  WRONG_NUMBER
+  CALLBACK_REQUESTED
+  NOT_INTERESTED
+}
+
 // ==================== MODELS ====================
 
 // Dynamic User Role model - supports future role expansion
@@ -197,6 +225,11 @@ model User {
   // Attendance Relations
   attendances             Attendance[]
 
+  // Lead Relations
+  assignedLeads           Lead[]           @relation("LeadAssignedTo")
+  createdLeads            Lead[]           @relation("LeadCreatedBy")
+  leadActivities          LeadActivity[]
+
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 
@@ -257,6 +290,7 @@ model Service {
   updatedAt              DateTime        @updatedAt
 
   clientCases            ClientCase[]
+  leads                  Lead[]
 
   @@map("services")
 }
@@ -733,4 +767,62 @@ model DailyAiDigest {
   updatedAt         DateTime  @updatedAt
 
   @@map("daily_ai_digests")
+}
+
+// ==================== LEADS MANAGEMENT & ACTIVITY LOG ====================
+
+model Lead {
+  id              String       @id @default(uuid())
+  fullName        String
+  phone           String
+  email           String?
+  address         String?
+  country         String?
+  referralName    String?
+  status          LeadStatus   @default(NEW)
+
+  // Relations
+  serviceId       String?
+  service         Service?     @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  assignedToId    String?
+  assignedTo      User?        @relation("LeadAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  createdById     String?
+  createdBy       User?        @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdByName   String?
+
+  isDeleted       Boolean      @default(false)
+  deletedAt       DateTime?
+
+  activities      LeadActivity[]
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([status, isDeleted])
+  @@index([assignedToId])
+  @@index([serviceId])
+  @@map("leads")
+}
+
+model LeadActivity {
+  id              String           @id @default(uuid())
+  leadId          String
+  lead            Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  activityType    LeadActivityType @default(NOTE)
+  callOutcome     CallOutcome?
+  notes           String?          @db.Text
+  nextFollowUp    DateTime?
+
+  performedById   String?
+  performedBy     User?            @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  performedByName String?
+
+  createdAt       DateTime         @default(now())
+
+  @@index([leadId])
+  @@index([performedById])
+  @@map("lead_activities")
 }
