@@ -65,6 +65,8 @@ const getAllCases = catchAsync(async (req: Request, res: Response) => {
     search: req.query.search as string | undefined,
     status: req.query.status as string | undefined,
     category: req.query.category as string | undefined,
+    startDate: req.query.startDate as string | undefined,
+    endDate: req.query.endDate as string | undefined,
   };
   const result = await ClientCaseService.getAllCases(req.user!.id, req.user?.role, filters);
   sendResponse(res, {

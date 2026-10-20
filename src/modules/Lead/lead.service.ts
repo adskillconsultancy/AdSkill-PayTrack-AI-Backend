@@ -225,7 +225,7 @@ const getAllLeads = async (
   }
 
   // Date range
-  const dateFilter = buildDateRangeFilter(startDate, endDate, "createdAt");
+  const dateFilter = buildDateRangeFilter("createdAt", startDate, endDate);
   if (dateFilter) {
     andConditions.push(dateFilter as Prisma.LeadWhereInput);
   }

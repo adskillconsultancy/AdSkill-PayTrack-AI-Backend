@@ -33,10 +33,28 @@ export const buildSearchFilter = (
  * Handles ISO timestamps and YYYY-MM-DD strings.
  */
 export const buildDateRangeFilter = (
-  fieldName: string = "createdAt",
-  startDate?: string,
-  endDate?: string
+  fieldNameOrStartDate: string = "createdAt",
+  startDateOrEndDate?: string,
+  endDateOrFieldName?: string
 ): Record<string, { gte?: Date; lte?: Date }> | undefined => {
+  let fieldName = "createdAt";
+  let startDate: string | undefined;
+  let endDate: string | undefined;
+
+  // Check if first argument is a date string instead of a field name
+  if (
+    /^\d{4}-\d{2}-\d{2}/.test(fieldNameOrStartDate) ||
+    (endDateOrFieldName && !/^\d{4}/.test(endDateOrFieldName))
+  ) {
+    startDate = fieldNameOrStartDate;
+    endDate = startDateOrEndDate;
+    fieldName = endDateOrFieldName || "createdAt";
+  } else {
+    fieldName = fieldNameOrStartDate || "createdAt";
+    startDate = startDateOrEndDate;
+    endDate = endDateOrFieldName;
+  }
+
   if (!startDate && !endDate) {
     return undefined;
   }
@@ -44,19 +62,19 @@ export const buildDateRangeFilter = (
   const range: { gte?: Date; lte?: Date } = {};
 
   if (startDate) {
-    const start = new Date(startDate);
+    const start = new Date(
+      startDate.length === 10 ? `${startDate}T00:00:00.000Z` : startDate
+    );
     if (!isNaN(start.getTime())) {
       range.gte = start;
     }
   }
 
   if (endDate) {
-    const end = new Date(endDate);
+    const end = new Date(
+      endDate.length === 10 ? `${endDate}T23:59:59.999Z` : endDate
+    );
     if (!isNaN(end.getTime())) {
-      // If user passed YYYY-MM-DD, stretch to end of day
-      if (endDate.length === 10) {
-        end.setUTCHours(23, 59, 59, 999);
-      }
       range.lte = end;
     }
   }

@@ -4,6 +4,7 @@ import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
 import { AuditService } from "../Audit/audit.service";
 import { NotificationService } from "../Notification/notification.service";
+import { buildDateRangeFilter } from "../../shared/filterHelper";
 import { TCreateClientCasePayload, TUpdateClientCasePayload } from "./client-case.interface";
 
 const caseSelect = {
@@ -347,7 +348,7 @@ const updateCase = async (
 const getAllCases = async (
   actorUserId: string,
   userRole?: string,
-  filters?: { search?: string; status?: string; category?: string },
+  filters?: { search?: string; status?: string; category?: string; startDate?: string; endDate?: string },
 ) => {
   const whereClause: Prisma.ClientCaseWhereInput = {
     isDeleted: false,
@@ -355,11 +356,17 @@ const getAllCases = async (
     ...(userRole === "CONSULTANT" ? { assignedConsultantId: actorUserId } : {}),
   };
 
-  if (filters?.status) {
+  if (filters?.status && filters.status !== "ALL") {
     whereClause.caseStatus = filters.status as any;
   }
-  if (filters?.category) {
+  if (filters?.category && filters.category !== "ALL") {
     whereClause.caseCategory = filters.category;
+  }
+  if (filters?.startDate || filters?.endDate) {
+    const dateRange = buildDateRangeFilter("createdAt", filters.startDate, filters.endDate);
+    if (dateRange?.createdAt) {
+      whereClause.createdAt = dateRange.createdAt;
+    }
   }
   if (filters?.search) {
     const q = filters.search.trim();
