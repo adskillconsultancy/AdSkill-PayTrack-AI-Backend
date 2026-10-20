@@ -206,6 +206,21 @@ export interface TAdSkillContactInfo {
   portalUrl: string;
 }
 
+export interface TClientConsultantInfo {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  whatsapp?: string | null;
+}
+
+export interface TClientCaseNoteItem {
+  id: string;
+  content: string;
+  createdAt: string;
+  authorName: string;
+}
+
 export interface TClientDashboardSummary {
   hasActiveCase: boolean;
   caseId: string | null;
@@ -215,6 +230,9 @@ export interface TClientDashboardSummary {
   currency: string;
   caseStatus: string | null;
   financialStatus: string | null;
+  clientVisibleNotes: string | null;
+  assignedConsultant: TClientConsultantInfo | null;
+  clientNotes: TClientCaseNoteItem[];
   totalProfessionalFee: number;
   totalPaid: number;
   remainingBalance: number;
@@ -229,4 +247,5 @@ export interface TClientDashboardSummary {
   adskillContact: TAdSkillContactInfo;
   feeDisclaimer: string;
 }
+
 

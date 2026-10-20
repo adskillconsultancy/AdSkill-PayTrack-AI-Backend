@@ -19,6 +19,8 @@ import {
   TClientInvoiceItem,
   TClientReceiptItem,
   TAdSkillContactInfo,
+  TClientConsultantInfo,
+  TClientCaseNoteItem,
 } from "./dashboard.interface";
 
 /**
@@ -658,6 +660,31 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
         where: { isDeleted: false },
         orderBy: { issuedAt: "desc" },
       },
+      assignedConsultant: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          whatsapp: true,
+        },
+      },
+      caseNotes: {
+        where: {
+          visibility: "CLIENT",
+          isDeleted: false,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        include: {
+          author: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -683,6 +710,9 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
       currency: "USD",
       caseStatus: null,
       financialStatus: null,
+      clientVisibleNotes: null,
+      assignedConsultant: null,
+      clientNotes: [],
       totalProfessionalFee: 0,
       totalPaid: 0,
       remainingBalance: 0,
@@ -758,6 +788,23 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
     paymentId: rec.paymentId,
   }));
 
+  const clientNotes: TClientCaseNoteItem[] = (activeCase.caseNotes || []).map((n) => ({
+    id: n.id,
+    content: n.content,
+    createdAt: n.createdAt.toISOString(),
+    authorName: n.author?.name || "Legal Advisor",
+  }));
+
+  const assignedConsultant: TClientConsultantInfo | null = activeCase.assignedConsultant
+    ? {
+        id: activeCase.assignedConsultant.id,
+        name: activeCase.assignedConsultant.name,
+        email: activeCase.assignedConsultant.email,
+        phone: activeCase.assignedConsultant.phone,
+        whatsapp: activeCase.assignedConsultant.whatsapp,
+      }
+    : null;
+
   return {
     hasActiveCase: true,
     caseId: activeCase.id,
@@ -767,6 +814,9 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
     currency,
     caseStatus: activeCase.caseStatus,
     financialStatus: activeCase.financialStatus,
+    clientVisibleNotes: activeCase.clientVisibleNotes || null,
+    assignedConsultant,
+    clientNotes,
     totalProfessionalFee,
     totalPaid,
     remainingBalance,
