@@ -22,6 +22,7 @@ import { NotificationRoutes } from "../modules/Notification/notification.route";
 import { AttendanceRoutes } from "../modules/Attendance/attendance.route";
 import { StripeRoutes } from "../modules/Stripe/stripe.route";
 import { LeadRoutes } from "../modules/Lead/lead.route";
+import { OfficeExpenseRoutes } from "../modules/OfficeExpense/office-expense.route";
 
 
 const router = Router();
@@ -114,6 +115,10 @@ const moduleRoutes = [
   {
     path: "/leads",
     route: LeadRoutes,
+  },
+  {
+    path: "/office-expenses",
+    route: OfficeExpenseRoutes,
   },
 ];
 

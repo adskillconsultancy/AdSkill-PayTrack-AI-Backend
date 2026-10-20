@@ -76,6 +76,13 @@ export const PERMISSIONS = {
   ATTENDANCE_READ_SELF: "attendance:read-self",
   ATTENDANCE_READ_ALL: "attendance:read-all",
   ATTENDANCE_DIGEST_READ: "attendance:digest-read",
+
+  // Office Expense / Income Tracker
+  EXPENSE_READ: "expense:read",
+  EXPENSE_CREATE: "expense:create",
+  EXPENSE_UPDATE: "expense:update",
+  EXPENSE_DELETE: "expense:delete",
+  EXPENSE_MANAGE: "expense:manage",
 } as const;
 
 export const userSearchableFields: string[] = [
