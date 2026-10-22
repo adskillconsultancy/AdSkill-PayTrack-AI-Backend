@@ -730,7 +730,7 @@ model EmailAuditLog {
   @@map("email_audit_logs")
 }
 
-// ==================== ATTENDANCE TRACKER & AI DIGEST ====================
+// ==================== ATTENDANCE TRACKER ====================
 
 model Attendance {
   id           String           @id @default(uuid())
@@ -756,23 +756,7 @@ model Attendance {
   @@map("attendances")
 }
 
-model DailyAiDigest {
-  id                String    @id @default(uuid())
-  date              DateTime  @unique @db.Date
-  summaryContent    String    @db.Text
-  totalHoursLogged  Float     @default(0)
-  activeUsersCount  Int       @default(0)
-  paymentsCollected Float     @default(0)
-  metadata          Json?
 
-  isDeleted         Boolean   @default(false)
-  deletedAt         DateTime?
-
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
-  @@map("daily_ai_digests")
-}
 
 // ==================== LEADS MANAGEMENT & ACTIVITY LOG ====================
 

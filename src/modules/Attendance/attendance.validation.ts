@@ -18,15 +18,9 @@ const updateFocusSchema = z.object({
   }),
 });
 
-const generateDigestSchema = z.object({
-  body: z.object({
-    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format, expected YYYY-MM-DD").optional(),
-  }),
-});
 
 export const AttendanceValidation = {
   clockInSchema,
   clockOutSchema,
   updateFocusSchema,
-  generateDigestSchema,
 };

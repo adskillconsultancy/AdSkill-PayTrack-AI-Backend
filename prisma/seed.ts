@@ -66,11 +66,10 @@ export const CANONICAL_PERMISSIONS = [
   // Audit Log — Super Admin Only
   { name: 'audit:read', module: 'AUDIT', description: 'View immutable system audit log (Super Admin only)' },
 
-  // Attendance Tracker & AI Digest (Universal PBAC)
+  // Attendance Tracker (Universal PBAC)
   { name: 'attendance:track', module: 'ATTENDANCE', description: 'Clock in and clock out of work shifts' },
   { name: 'attendance:read-self', module: 'ATTENDANCE', description: 'View personal attendance history and status' },
   { name: 'attendance:read-all', module: 'ATTENDANCE', description: 'View team attendance history and real-time active status' },
-  { name: 'attendance:digest-read', module: 'ATTENDANCE', description: 'View daily AI executive attendance and activity digests' },
 ];
 
 // Role to Permission Mappings
@@ -110,7 +109,6 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'attendance:track',
     'attendance:read-self',
     'attendance:read-all',
-    'attendance:digest-read',
   ],
   CONSULTANT: [
     'user:read',

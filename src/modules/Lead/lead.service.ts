@@ -825,7 +825,7 @@ const completeFollowUp = async (
       select: leadSelect,
     });
 
-    // 2. Log immutable audit activity record for EOD report & AI digest
+    // 2. Log immutable audit activity record for EOD activity report
     const followUpNote = payload.notes?.trim()
       ? payload.notes.trim()
       : hasNextSchedule

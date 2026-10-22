@@ -48,14 +48,6 @@ export interface TDashboardAttendanceSummary {
     status: string;
     currentFocus: string | null;
   }[];
-  aiDigest: {
-    id: string;
-    date: string;
-    summaryContent: string;
-    totalHoursLogged: number;
-    activeUsersCount: number;
-    paymentsCollected: number;
-  } | null;
 }
 
 export interface TPaymentStatusDistribution {

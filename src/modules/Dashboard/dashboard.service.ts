@@ -853,7 +853,6 @@ const getAttendanceSummary = async (
     currentlyActiveCount,
     attendancesInRange,
     totalStaffCount,
-    aiDigest,
   ] = await Promise.all([
     prisma.attendance.count({
       where: {
@@ -904,12 +903,6 @@ const getAttendanceSummary = async (
         role: {
           name: { not: "CLIENT" },
         },
-      },
-    }),
-    prisma.dailyAiDigest.findFirst({
-      where: {
-        isDeleted: false,
-        date: attStartDate,
       },
     }),
   ]);
@@ -964,16 +957,6 @@ const getAttendanceSummary = async (
     activeStaffCount,
     totalStaffCount,
     recentRecords,
-    aiDigest: aiDigest
-      ? {
-          id: aiDigest.id,
-          date: aiDigest.date.toISOString(),
-          summaryContent: aiDigest.summaryContent,
-          totalHoursLogged: aiDigest.totalHoursLogged,
-          activeUsersCount: aiDigest.activeUsersCount,
-          paymentsCollected: aiDigest.paymentsCollected,
-        }
-      : null,
   };
 };
 

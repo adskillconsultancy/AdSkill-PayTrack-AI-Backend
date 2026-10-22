@@ -50,18 +50,5 @@ router.get(
   AttendanceController.getTeamAttendance,
 );
 
-// Daily AI Digest (Admin & Manager with attendance:digest-read)
-router.get(
-  "/digest/today",
-  auth(PERMISSIONS.ATTENDANCE_DIGEST_READ),
-  AttendanceController.getTodayDigest,
-);
-
-router.post(
-  "/digest/generate",
-  auth(PERMISSIONS.ATTENDANCE_DIGEST_READ),
-  validateRequest(AttendanceValidation.generateDigestSchema),
-  AttendanceController.generateDigest,
-);
 
 export const AttendanceRoutes = router;

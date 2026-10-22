@@ -69,27 +69,6 @@ const getTeamAttendance = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getTodayDigest = catchAsync(async (req: Request, res: Response) => {
-  const dateStr = req.query.date as string | undefined;
-  const result = await AttendanceService.getOrGenerateDailyDigest(dateStr);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Daily AI Digest retrieved successfully",
-    data: result,
-  });
-});
-
-const generateDigest = catchAsync(async (req: Request, res: Response) => {
-  const dateStr = req.body?.date || (req.query.date as string | undefined);
-  const result = await AttendanceService.generateDailyDigest(dateStr);
-  sendResponse(res, {
-    statusCode: httpStatus.OK,
-    success: true,
-    message: "Daily AI Digest generated successfully",
-    data: result,
-  });
-});
 
 export const AttendanceController = {
   clockIn,
@@ -98,6 +77,4 @@ export const AttendanceController = {
   getCurrentStatus,
   getMyHistory,
   getTeamAttendance,
-  getTodayDigest,
-  generateDigest,
 };
