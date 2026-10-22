@@ -45,7 +45,76 @@ const getReportOverview = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getStaffPerformanceReport = catchAsync(
+  async (req: Request, res: Response) => {
+    const actor = req.user!;
+    const payload = {
+      searchTerm:
+        req.body?.searchTerm ||
+        (req.query?.searchTerm as string) ||
+        (req.query?.search as string) ||
+        undefined,
+      staffId:
+        req.body?.staffId || (req.query?.staffId as string) || undefined,
+      roleId: req.body?.roleId || (req.query?.roleId as string) || undefined,
+      startDate:
+        req.body?.startDate || (req.query?.startDate as string) || undefined,
+      endDate:
+        req.body?.endDate || (req.query?.endDate as string) || undefined,
+      sortBy:
+        req.body?.sortBy || (req.query?.sortBy as any) || "verifiedAmount",
+      sortOrder:
+        req.body?.sortOrder || (req.query?.sortOrder as any) || "desc",
+      page: req.body?.page || (req.query?.page ? Number(req.query.page) : 1),
+      limit:
+        req.body?.limit || (req.query?.limit ? Number(req.query.limit) : 10),
+    };
+
+    const result = await ReportService.getStaffPerformanceReport(
+      payload,
+      actor,
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Staff operational and performance report generated successfully",
+      meta: result.meta,
+      data: {
+        kpis: result.kpis,
+        items: result.items,
+      },
+    });
+  },
+);
+
+const getStaffPerformanceTimeline = catchAsync(
+  async (req: Request, res: Response) => {
+    const actor = req.user!;
+    const staffId = req.params.staffId;
+    const startDate = (req.query.startDate as string) || undefined;
+    const endDate = (req.query.endDate as string) || undefined;
+
+    const result = await ReportService.getStaffPerformanceTimeline(
+      staffId,
+      startDate,
+      endDate,
+      actor,
+    );
+
+    sendResponse(res, {
+      statusCode: httpStatus.OK,
+      success: true,
+      message: "Staff activity timeline retrieved successfully",
+      data: result,
+    });
+  },
+);
+
 export const ReportController = {
   generateReport,
   getReportOverview,
+  getStaffPerformanceReport,
+  getStaffPerformanceTimeline,
 };
+
