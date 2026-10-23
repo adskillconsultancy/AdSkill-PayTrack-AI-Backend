@@ -82,6 +82,13 @@ export const PERMISSIONS = {
   EXPENSE_UPDATE: "expense:update",
   EXPENSE_DELETE: "expense:delete",
   EXPENSE_MANAGE: "expense:manage",
+
+  // Lead / CRM Pipeline
+  LEAD_READ: "lead:read",
+  LEAD_CREATE: "lead:create",
+  LEAD_UPDATE: "lead:update",
+  LEAD_DELETE: "lead:delete",
+  LEAD_MANAGE: "lead:manage",
 } as const;
 
 export const userSearchableFields: string[] = [
