@@ -147,6 +147,13 @@ export const ROLE_PERMISSION_MAPPING: Record<string, string[]> = {
     'support:create',
     'support:reply',
   ],
+  USER: [
+    'user:read',
+    'service:read',
+    'support:read',
+    'support:create',
+    'support:reply',
+  ],
 };
 
 async function main() {

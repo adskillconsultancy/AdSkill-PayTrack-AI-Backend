@@ -108,7 +108,7 @@ const getUserListSelect = (startDate?: string, endDate?: string) => {
 };
 
 // Helper to generate a unique Client ID (e.g. ASK-2026-1042)
-const generateClientId = async (): Promise<string> => {
+export const generateClientId = async (): Promise<string> => {
   const currentYear = new Date().getFullYear();
   let isUnique = false;
   let clientId = "";
@@ -158,12 +158,12 @@ const createUser = async (
     );
   }
 
-  // Resolve role: use provided roleId, roleName, or default to CLIENT per specification
+  // Resolve role: use provided roleId, roleName, or default to USER per specification
   let targetRoleId = payload.roleId;
   let targetRole: { id: string; name: string } | null = null;
 
   if (!targetRoleId) {
-    const roleToFind = payload.roleName || "CLIENT";
+    const roleToFind = payload.roleName || "USER";
     targetRole = await prisma.userRole.findFirst({
       where: { name: roleToFind, isDeleted: false },
       select: { id: true, name: true },
@@ -191,7 +191,7 @@ const createUser = async (
   }
 
   // Privilege Escalation Guard: Check staff and Super Admin role assignment permissions
-  if (targetRole.name !== "CLIENT") {
+  if (targetRole.name !== "CLIENT" && targetRole.name !== "USER") {
     const isSuperAdmin = actorRole === "SUPER_ADMIN";
     const canManageRole = actorPermissions.includes(PERMISSIONS.USER_MANAGE_ROLE);
     if (!isSuperAdmin && !canManageRole) {
@@ -264,8 +264,8 @@ const createUser = async (
     );
   }
 
-  let assignedClientId = userData.clientId;
-  if (!assignedClientId) {
+  let assignedClientId: string | null = userData.clientId || null;
+  if (!assignedClientId && targetRole.name === "CLIENT") {
     assignedClientId = await generateClientId();
   }
 
@@ -542,8 +542,15 @@ const updateUser = async (
           `Role "${roleName}" does not exist`,
         );
       }
+      if (role.name === "CLIENT" && !existingUser.clientId) {
+        updateData.clientId = await generateClientId();
+      }
       updateData.role = { connect: { id: role.id } };
     } else if (payload.roleId) {
+      const roleObj = await prisma.userRole.findUnique({ where: { id: payload.roleId } });
+      if (roleObj?.name === "CLIENT" && !existingUser.clientId) {
+        updateData.clientId = await generateClientId();
+      }
       updateData.role = { connect: { id: payload.roleId } };
     }
   }

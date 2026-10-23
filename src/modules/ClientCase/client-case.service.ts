@@ -6,6 +6,7 @@ import { AuditService } from "../Audit/audit.service";
 import { NotificationService } from "../Notification/notification.service";
 import { buildDateRangeFilter } from "../../shared/filterHelper";
 import { TCreateClientCasePayload, TUpdateClientCasePayload } from "./client-case.interface";
+import { generateClientId } from "../User/user.service";
 
 const caseSelect = {
   id: true,
@@ -152,12 +153,30 @@ const createClientCase = async (
   if (!user) throw new AppError(httpStatus.UNAUTHORIZED, "Active client account required");
   if (!service) throw new AppError(httpStatus.NOT_FOUND, "Active service not found");
 
+  // If user is currently uncontracted "USER" or lacks a clientId, promote to "CLIENT" and assign clientId
+  let activeClientId = user.clientId;
+  if (user.role?.name === "USER" || !activeClientId) {
+    const clientRole = await prisma.userRole.findFirst({
+      where: { name: "CLIENT", isDeleted: false },
+    });
+    if (!activeClientId) {
+      activeClientId = await generateClientId();
+    }
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        ...(clientRole ? { roleId: clientRole.id } : {}),
+        clientId: activeClientId,
+      },
+    });
+  }
+
   const assignedConsultantId =
     userRole === "CONSULTANT"
       ? actorUserId
       : (payload.assignedConsultantId ?? undefined);
 
-  const caseCode = await createCaseCode(user.clientId);
+  const caseCode = await createCaseCode(activeClientId);
   const created = await prisma.clientCase.create({
     data: {
       caseCode,

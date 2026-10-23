@@ -170,7 +170,7 @@ const formatAuthUser = (user: any): TAuthUserResponse => {
 };
 
 // Helper to generate a unique Client ID (e.g. ASK-2026-1042)
-const generateClientId = async (): Promise<string> => {
+export const generateClientId = async (): Promise<string> => {
   const currentYear = new Date().getFullYear();
   let isUnique = false;
   let clientId = "";
@@ -245,14 +245,14 @@ const register = async (payload: TRegisterPayload): Promise<TAuthResponse> => {
     );
   }
 
-  const clientRole = await prisma.userRole.findFirst({
-    where: { name: "CLIENT", isDeleted: false },
+  const userRole = await prisma.userRole.findFirst({
+    where: { name: "USER", isDeleted: false },
   });
 
-  if (!clientRole) {
+  if (!userRole) {
     throw new AppError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      "Default CLIENT role is not initialized in the database. Please run seeding."
+      "Default USER role is not initialized in the database. Please run seeding."
     );
   }
 
@@ -261,7 +261,6 @@ const register = async (payload: TRegisterPayload): Promise<TAuthResponse> => {
     config.bcrypt_salt_rounds
   );
 
-  const clientId = await generateClientId();
   const { password: rawPassword, ...userData } = payload;
 
   const user = await prisma.user.create({
@@ -269,8 +268,8 @@ const register = async (payload: TRegisterPayload): Promise<TAuthResponse> => {
       ...userData,
       email: payload.email.toLowerCase().trim(),
       password: hashedPassword,
-      clientId,
-      roleId: clientRole.id,
+      clientId: null,
+      roleId: userRole.id,
       status: "ACTIVE",
       isDeleted: false,
     },
