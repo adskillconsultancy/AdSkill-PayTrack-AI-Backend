@@ -97,6 +97,35 @@ export const CANONICAL_PERMISSIONS = [
 async function main() {
   console.log("🌱 Starting Pure Super Admin Setup...");
 
+  // 0. Full Database Wipe
+  console.log("--- 0. Deleting ALL Existing Data Across All Tables ---");
+  await prisma.auditLog.deleteMany({});
+  await prisma.stripeWebhookLog.deleteMany({});
+  await prisma.emailAuditLog.deleteMany({});
+  await prisma.officeExpense.deleteMany({});
+  await prisma.attendance.deleteMany({});
+  await prisma.supportMessage.deleteMany({});
+  await prisma.supportTicket.deleteMany({});
+  await prisma.caseNote.deleteMany({});
+  await prisma.document.deleteMany({});
+  await prisma.receipt.deleteMany({});
+  await prisma.invoice.deleteMany({});
+  await prisma.payment.deleteMany({});
+  await prisma.installment.deleteMany({});
+  await prisma.paymentPlan.deleteMany({});
+  await prisma.leadActivity.deleteMany({});
+  await prisma.lead.deleteMany({});
+  await prisma.clientCase.deleteMany({});
+  await prisma.service.deleteMany({});
+  await prisma.notificationPreference.deleteMany({});
+  await prisma.notification.deleteMany({});
+  await prisma.userPermission.deleteMany({});
+  await prisma.rolePermission.deleteMany({});
+  await prisma.user.deleteMany({});
+  await prisma.userRole.deleteMany({});
+  await prisma.permission.deleteMany({});
+  console.log("✅ All existing data deleted completely. Database is blank!");
+
   // 1. Seed Permissions in batch
   console.log("--- 1. Seeding Canonical Permissions ---");
   await prisma.permission.createMany({
