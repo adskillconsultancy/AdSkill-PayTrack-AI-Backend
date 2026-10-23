@@ -11,6 +11,7 @@ import prisma from "../../lib/prisma";
 import { AuditService } from "../Audit/audit.service";
 import { UPLOAD_FOLDERS } from "./upload.constant";
 import { TUploadedDocument } from "./upload.interface";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
 const sanitizeFileName = (fileName: string) =>
   fileName.trim().replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-").slice(0, 120);
@@ -18,9 +19,22 @@ const sanitizeFileName = (fileName: string) =>
 const isStaffActor = async (actorId: string) => {
   const actor = await prisma.user.findFirst({
     where: { id: actorId, isDeleted: false, status: "ACTIVE" },
-    select: { role: { select: { name: true } } },
+    select: {
+      role: {
+        select: {
+          name: true,
+          rolePermissions: { select: { permission: { select: { name: true } } } },
+        },
+      },
+      userPermissions: { select: { permission: { select: { name: true } } } },
+    },
   });
-  return actor?.role.name !== "CLIENT";
+  if (!actor) return false;
+  const permissions = [
+    ...(actor.role?.rolePermissions.map((rp) => rp.permission.name) || []),
+    ...(actor.userPermissions.map((up) => up.permission.name) || []),
+  ];
+  return hasStaffCapabilities(permissions, actor.role?.name);
 };
 
 const hasValidSignature = (file: Express.Multer.File) => {

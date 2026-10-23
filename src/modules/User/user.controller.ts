@@ -5,6 +5,7 @@ import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { userFilterableFields } from "./user.constant";
 import { UserService } from "./user.service";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
 const createUser = catchAsync(async (req: Request, res: Response) => {
   const result = await UserService.createUser(
@@ -24,10 +25,10 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getAllUsers = catchAsync(async (req: Request, res: Response) => {
-  if (req.user?.role === "CLIENT") {
+  if (!hasStaffCapabilities(req.user?.permissions, req.user?.role)) {
     throw new AppError(
       httpStatus.FORBIDDEN,
-      "Clients are not authorized to view the user directory",
+      "You are not authorized to view the user directory",
     );
   }
 
@@ -59,6 +60,7 @@ const getAllUsers = catchAsync(async (req: Request, res: Response) => {
     sortOptions,
     req.user?.id,
     req.user?.role,
+    req.user?.permissions,
   );
 
   sendResponse(res, {
@@ -76,6 +78,7 @@ const getUserById = catchAsync(async (req: Request, res: Response) => {
     id,
     req.user?.id,
     req.user?.role,
+    req.user?.permissions,
   );
 
   sendResponse(res, {

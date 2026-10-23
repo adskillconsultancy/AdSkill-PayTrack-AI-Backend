@@ -22,6 +22,7 @@ const createTicket = catchAsync(async (req: Request, res: Response) => {
     req.user!.id,
     req.user?.role,
     req.body,
+    req.user?.permissions || [],
   );
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -46,7 +47,7 @@ const getTickets = catchAsync(async (req: Request, res: Response) => {
   };
 
   const result = await SupportService.getTickets(
-    { id: req.user!.id, role: req.user?.role },
+    { id: req.user!.id, role: req.user?.role, permissions: req.user?.permissions || [] },
     filters,
   );
 
@@ -62,7 +63,7 @@ const getTickets = catchAsync(async (req: Request, res: Response) => {
 const getTicketById = catchAsync(async (req: Request, res: Response) => {
   const result = await SupportService.getTicketById(
     req.params.id,
-    { id: req.user!.id, role: req.user?.role },
+    { id: req.user!.id, role: req.user?.role, permissions: req.user?.permissions || [] },
   );
 
   sendResponse(res, {
@@ -76,7 +77,7 @@ const getTicketById = catchAsync(async (req: Request, res: Response) => {
 const sendMessage = catchAsync(async (req: Request, res: Response) => {
   const result = await SupportService.sendMessage(
     req.params.id,
-    { id: req.user!.id, role: req.user?.role },
+    { id: req.user!.id, role: req.user?.role, permissions: req.user?.permissions || [] },
     req.body,
   );
 
@@ -91,7 +92,7 @@ const sendMessage = catchAsync(async (req: Request, res: Response) => {
 const updateTicketStatus = catchAsync(async (req: Request, res: Response) => {
   const result = await SupportService.updateTicketStatus(
     req.params.id,
-    { id: req.user!.id, role: req.user?.role },
+    { id: req.user!.id, role: req.user?.role, permissions: req.user?.permissions || [] },
     req.body,
   );
 
@@ -107,6 +108,7 @@ const getConversations = catchAsync(async (req: Request, res: Response) => {
   const result = await SupportService.getConversations({
     id: req.user!.id,
     role: req.user?.role,
+    permissions: req.user?.permissions || [],
   });
 
   sendResponse(res, {
@@ -120,7 +122,7 @@ const getConversations = catchAsync(async (req: Request, res: Response) => {
 const markTicketRead = catchAsync(async (req: Request, res: Response) => {
   const result = await SupportService.markTicketRead(
     req.params.id,
-    { id: req.user!.id, role: req.user?.role },
+    { id: req.user!.id, role: req.user?.role, permissions: req.user?.permissions || [] },
   );
 
   sendResponse(res, {

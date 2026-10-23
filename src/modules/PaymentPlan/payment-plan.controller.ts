@@ -3,8 +3,9 @@ import httpStatus from "http-status";
 import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { PaymentPlanService } from "./payment-plan.service";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
-const isStaff = (req: Request) => req.user?.role !== "CLIENT";
+const isStaff = (req: Request) => hasStaffCapabilities(req.user?.permissions, req.user?.role);
 
 const createPaymentPlan = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentPlanService.createPaymentPlan(

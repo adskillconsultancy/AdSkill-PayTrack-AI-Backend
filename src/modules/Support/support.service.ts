@@ -21,6 +21,7 @@ import {
   TConversationChannel,
   TConversationListResponse,
 } from "./support.interface";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
 const CURATED_FAQS: TFaqItem[] = [
   {
@@ -194,6 +195,7 @@ const createTicket = async (
   userId: string,
   userRole: string | undefined,
   payload: TCreateSupportTicketPayload,
+  permissions: string[] = [],
 ) => {
   let targetCaseId = payload.caseId;
   let resolvedConsultantId: string | null = null;
@@ -254,7 +256,7 @@ const createTicket = async (
   }
 
   const ticketCode = await generateTicketCode();
-  const isStaffReply = userRole !== "CLIENT";
+  const isStaffReply = hasStaffCapabilities(permissions, userRole);
 
   // Create ticket and initial message atomically with Prisma nested write
   const ticket = await prisma.supportTicket.create({
@@ -350,7 +352,7 @@ const createTicket = async (
  * Get Tickets list scoped by user role and filters
  */
 const getTickets = async (
-  user: { id: string; role?: string },
+  user: { id: string; role?: string; permissions?: string[] },
   filters: TTicketFilterOptions,
 ) => {
   const {
@@ -374,11 +376,17 @@ const getTickets = async (
     isDeleted: false,
   };
 
+  const isStaff = hasStaffCapabilities(user.permissions, user.role);
+  const canReadAll =
+    (user.permissions && (user.permissions.includes("case:manage") || user.permissions.includes("user:manage-role"))) ||
+    user.role === "SUPER_ADMIN" ||
+    user.role === "MANAGER";
+
   // Role Scoping
-  if (user.role === "CLIENT") {
+  if (!isStaff) {
     whereConditions.clientId = user.id;
-  } else if (user.role === "CONSULTANT") {
-    // Consultant sees tickets where they are assigned as consultant OR assigned as staff
+  } else if (!canReadAll) {
+    // Consultant/Staff sees tickets where they are assigned as consultant OR assigned as staff
     if (scope === "assigned_to_me" || !scope) {
       whereConditions.OR = [
         { assignedConsultantId: user.id },
@@ -386,7 +394,7 @@ const getTickets = async (
         { case: { assignedConsultantId: user.id } },
       ];
     }
-  } else if (user.role === "SUPER_ADMIN" || user.role === "MANAGER") {
+  } else {
     // Super Admin & Manager can see everything or filter by scope
     if (scope === "assigned_to_me") {
       whereConditions.assignedStaffId = user.id;
@@ -572,7 +580,7 @@ const getTickets = async (
  */
 const getTicketById = async (
   ticketId: string,
-  user: { id: string; role?: string },
+  user: { id: string; role?: string; permissions?: string[] },
 ) => {
   const ticket = await prisma.supportTicket.findFirst({
     where: { id: ticketId, isDeleted: false },
@@ -640,7 +648,8 @@ const getTicketById = async (
   }
 
   // Authorization Check
-  if (user.role === "CLIENT" && ticket.clientId !== user.id) {
+  const isStaff = hasStaffCapabilities(user.permissions, user.role);
+  if (!isStaff && ticket.clientId !== user.id) {
     throw new AppError(
       httpStatus.FORBIDDEN,
       "You are not authorized to view this support conversation",
@@ -700,7 +709,7 @@ const getTicketById = async (
  */
 const sendMessage = async (
   ticketId: string,
-  user: { id: string; role?: string },
+  user: { id: string; role?: string; permissions?: string[] },
   payload: TSendMessagePayload,
 ) => {
   const ticket = await prisma.supportTicket.findFirst({
@@ -720,7 +729,7 @@ const sendMessage = async (
     throw new AppError(httpStatus.NOT_FOUND, "Support ticket not found");
   }
 
-  const isStaffReply = user.role !== "CLIENT";
+  const isStaffReply = hasStaffCapabilities(user.permissions, user.role);
 
   // Access validation
   if (!isStaffReply && ticket.clientId !== user.id) {
@@ -812,13 +821,14 @@ const sendMessage = async (
  */
 const updateTicketStatus = async (
   ticketId: string,
-  user: { id: string; role?: string },
+  user: { id: string; role?: string; permissions?: string[] },
   payload: TUpdateTicketStatusPayload,
 ) => {
-  if (user.role === "CLIENT") {
+  const isStaff = hasStaffCapabilities(user.permissions, user.role);
+  if (!isStaff) {
     throw new AppError(
       httpStatus.FORBIDDEN,
-      "Clients are not permitted to modify ticket management properties",
+      "Clients and standard users are not permitted to modify ticket management properties",
     );
   }
 
@@ -940,7 +950,7 @@ const getMyInquiries = async (userId: string) => {
  */
 const markTicketRead = async (
   ticketId: string,
-  user: { id: string; role?: string },
+  user: { id: string; role?: string; permissions?: string[] },
 ) => {
   const ticket = await prisma.supportTicket.findFirst({
     where: { id: ticketId, isDeleted: false },
@@ -975,9 +985,10 @@ const markTicketRead = async (
  * For Staff: Shows incoming client conversations with unread badges and search
  */
 const getConversations = async (
-  user: { id: string; role?: string },
+  user: { id: string; role?: string; permissions?: string[] },
 ): Promise<TConversationListResponse> => {
-  const isClient = user.role === "CLIENT";
+  const isStaff = hasStaffCapabilities(user.permissions, user.role);
+  const isClient = !isStaff;
 
   if (isClient) {
     // 1. Fetch client's active case and consultant info

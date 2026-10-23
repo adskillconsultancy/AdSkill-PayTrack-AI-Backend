@@ -7,8 +7,9 @@ import prisma from "../../lib/prisma";
 import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { StripeService } from "./stripe.service";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
-const isStaff = (req: Request) => req.user?.role !== "CLIENT";
+const isStaff = (req: Request) => hasStaffCapabilities(req.user?.permissions, req.user?.role);
 
 // ─── Create Payment Intent ────────────────────────────────────────────────────
 

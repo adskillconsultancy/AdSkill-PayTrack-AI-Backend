@@ -3,8 +3,9 @@ import httpStatus from "http-status";
 import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { InvoiceService } from "./invoice.service";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
-const staff = (req: Request) => req.user?.role !== "CLIENT";
+const staff = (req: Request) => hasStaffCapabilities(req.user?.permissions, req.user?.role);
 
 const generateInvoice = catchAsync(async (req: Request, res: Response) => {
   const data = await InvoiceService.generateInvoice(req.params.caseId, req.user!.id, req.user?.role, req.user?.email);

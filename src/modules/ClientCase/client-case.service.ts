@@ -7,6 +7,7 @@ import { NotificationService } from "../Notification/notification.service";
 import { buildDateRangeFilter } from "../../shared/filterHelper";
 import { TCreateClientCasePayload, TUpdateClientCasePayload } from "./client-case.interface";
 import { generateClientId } from "../User/user.service";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
 const caseSelect = {
   id: true,
@@ -117,12 +118,21 @@ const sanitizeCaseNotes = <
 >(
   item: T,
   userRole?: string,
+  actorPermissions: string[] = [],
 ): T => {
   if (userRole === "SUPER_ADMIN") return item;
-  if (userRole === "CLIENT") {
-    return { ...item, internalNotes: null, superAdminNotes: null };
-  }
-  return { ...item, superAdminNotes: null };
+  const isStaffActor = hasStaffCapabilities(actorPermissions, userRole);
+  const canReadInternalNotes =
+    isStaffActor &&
+    (actorPermissions.length === 0 ||
+      actorPermissions.includes("note:read-internal") ||
+      actorPermissions.includes("case:manage"));
+
+  return {
+    ...item,
+    internalNotes: canReadInternalNotes ? item.internalNotes : null,
+    superAdminNotes: null,
+  };
 };
 
 const ensureOwnerOrStaff = (record: { userId: string }, actorId: string, staff = false) => {
@@ -136,8 +146,9 @@ const createClientCase = async (
   actorUserId: string,
   userRole?: string,
   actorEmail?: string,
+  actorPermissions: string[] = [],
 ) => {
-  const isStaff = userRole !== "CLIENT";
+  const isStaff = hasStaffCapabilities(actorPermissions, userRole);
   const targetUserId = (isStaff && payload.userId) ? payload.userId : actorUserId;
 
   const [user, service] = await Promise.all([
@@ -171,10 +182,14 @@ const createClientCase = async (
     });
   }
 
-  const assignedConsultantId =
-    userRole === "CONSULTANT"
-      ? actorUserId
-      : (payload.assignedConsultantId ?? undefined);
+  const canAssignAny =
+    actorPermissions.includes("case:assign") ||
+    actorPermissions.includes("case:manage") ||
+    userRole === "SUPER_ADMIN";
+
+  const assignedConsultantId = canAssignAny
+    ? (payload.assignedConsultantId ?? undefined)
+    : (isStaff ? actorUserId : undefined);
 
   const caseCode = await createCaseCode(activeClientId);
   const created = await prisma.clientCase.create({
@@ -264,33 +279,51 @@ const createClientCase = async (
     creatorRole: userRole,
   }).catch((err) => console.error("[NOTIFICATION_ERROR] dispatchCaseCreatedNotification:", err));
 
-  return sanitizeCaseNotes(created, userRole);
+  return sanitizeCaseNotes(created, userRole, actorPermissions);
 };
 
-const getCasesForUser = async (userId: string, userRole?: string) => {
+const getCasesForUser = async (userId: string, userRole?: string, actorPermissions: string[] = []) => {
+  const isStaff = hasStaffCapabilities(actorPermissions, userRole);
+  const canReadAll =
+    actorPermissions.includes("case:read-all") ||
+    actorPermissions.includes("case:manage") ||
+    userRole === "SUPER_ADMIN";
+
   const where: Prisma.ClientCaseWhereInput = {
     isDeleted: false,
-    ...(userRole === "CONSULTANT" ? { assignedConsultantId: userId } : { userId }),
+    ...(!isStaff ? { userId } : !canReadAll ? { assignedConsultantId: userId } : {}),
   };
   const list = await prisma.clientCase.findMany({
     where,
     select: caseSelect,
     orderBy: { createdAt: "desc" },
   });
-  return list.map((item) => sanitizeCaseNotes(item, userRole));
+  return list.map((item) => sanitizeCaseNotes(item, userRole, actorPermissions));
 };
 
-const getCaseById = async (id: string, userId: string, staff = false, userRole?: string) => {
+const getCaseById = async (
+  id: string,
+  userId: string,
+  staff = false,
+  userRole?: string,
+  actorPermissions: string[] = [],
+) => {
   const result = await prisma.clientCase.findFirst({
     where: { id, isDeleted: false },
     select: caseSelect,
   });
   if (!result) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   ensureOwnerOrStaff(result, userId, staff);
-  if (userRole === "CONSULTANT" && result.assignedConsultantId !== userId) {
+
+  const canReadAll =
+    actorPermissions.includes("case:read-all") ||
+    actorPermissions.includes("case:manage") ||
+    userRole === "SUPER_ADMIN";
+
+  if (staff && !canReadAll && result.assignedConsultantId !== userId) {
     throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
-  return sanitizeCaseNotes(result, userRole);
+  return sanitizeCaseNotes(result, userRole, actorPermissions);
 };
 
 const updateCase = async (
@@ -300,6 +333,7 @@ const updateCase = async (
   staff = false,
   userRole?: string,
   actorEmail?: string,
+  actorPermissions: string[] = [],
 ) => {
   const existing = await prisma.clientCase.findFirst({
     where: { id, isDeleted: false },
@@ -308,12 +342,22 @@ const updateCase = async (
   if (!existing) throw new AppError(httpStatus.NOT_FOUND, "Client case not found");
   ensureOwnerOrStaff(existing, userId, staff);
 
-  if (userRole === "CONSULTANT" && existing.assignedConsultantId !== userId) {
+  const canReadAll =
+    actorPermissions.includes("case:read-all") ||
+    actorPermissions.includes("case:manage") ||
+    userRole === "SUPER_ADMIN";
+
+  if (staff && !canReadAll && existing.assignedConsultantId !== userId) {
     throw new AppError(httpStatus.FORBIDDEN, "You are not assigned to this client case");
   }
 
-  if (userRole === "CONSULTANT" && payload.assignedConsultantId !== undefined && payload.assignedConsultantId !== existing.assignedConsultantId) {
-    throw new AppError(httpStatus.FORBIDDEN, "Consultants cannot reassign cases");
+  const canReassign =
+    actorPermissions.includes("case:assign") ||
+    actorPermissions.includes("case:manage") ||
+    userRole === "SUPER_ADMIN";
+
+  if (payload.assignedConsultantId !== undefined && payload.assignedConsultantId !== existing.assignedConsultantId && !canReassign) {
+    throw new AppError(httpStatus.FORBIDDEN, "You do not have permission to reassign cases");
   }
 
   if (!staff && (payload.caseStatus !== undefined || payload.internalNotes !== undefined || payload.assignedConsultantId !== undefined)) {
@@ -360,7 +404,7 @@ const updateCase = async (
     },
   });
 
-  return sanitizeCaseNotes(updated, userRole);
+  return sanitizeCaseNotes(updated, userRole, actorPermissions);
 };
 
 
@@ -368,11 +412,21 @@ const getAllCases = async (
   actorUserId: string,
   userRole?: string,
   filters?: { search?: string; status?: string; category?: string; startDate?: string; endDate?: string },
+  actorPermissions: string[] = [],
 ) => {
+  const isStaffActor = hasStaffCapabilities(actorPermissions, userRole);
+  const canReadAll =
+    actorPermissions.includes("case:read-all") ||
+    actorPermissions.includes("case:manage") ||
+    userRole === "SUPER_ADMIN";
+
   const whereClause: Prisma.ClientCaseWhereInput = {
     isDeleted: false,
-    ...(userRole === "CLIENT" ? { userId: actorUserId } : {}),
-    ...(userRole === "CONSULTANT" ? { assignedConsultantId: actorUserId } : {}),
+    ...(!isStaffActor
+      ? { userId: actorUserId }
+      : !canReadAll
+      ? { assignedConsultantId: actorUserId }
+      : {}),
   };
 
   if (filters?.status && filters.status !== "ALL") {
@@ -411,7 +465,7 @@ const getAllCases = async (
     orderBy: { createdAt: "desc" },
   });
 
-  return list.map((item) => sanitizeCaseNotes(item, userRole));
+  return list.map((item) => sanitizeCaseNotes(item, userRole, actorPermissions));
 };
 
 export const ClientCaseService = {

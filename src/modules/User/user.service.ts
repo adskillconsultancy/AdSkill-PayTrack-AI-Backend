@@ -22,6 +22,7 @@ import {
   TUpdateUserPayload,
   TUserFilterRequest,
 } from "./user.interface";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
 // Safe user projection (excludes password hash and mfaSecret)
 const safeUserSelect = {
@@ -310,6 +311,7 @@ const getAllUsers = async (
   sortOptions?: ISortOptions,
   actorUserId?: string,
   userRole?: string,
+  actorPermissions: string[] = [],
 ) => {
   const { page, limit, skip } = calculatePagination(paginationOptions);
   const orderBy = buildSortOrder(
@@ -337,8 +339,13 @@ const getAllUsers = async (
     isDeleted: isDeleted !== undefined ? isDeleted : false,
   });
 
-  // Client role can only view their own user account
-  if (userRole === "CLIENT" && actorUserId) {
+  // Non-staff actors (evaluated dynamically by capabilities) can only view their own user account
+  const isStaffActor = hasStaffCapabilities(actorPermissions, userRole);
+  if (!isStaffActor && actorUserId) {
+    if (excludeRoleName) {
+      // Trying to query staff directory
+      throw new AppError(httpStatus.FORBIDDEN, "Access to staff directory is restricted");
+    }
     andConditions.push({ id: actorUserId });
   }
 
@@ -467,6 +474,7 @@ const getUserById = async (
   idOrClientId: string,
   actorUserId?: string,
   userRole?: string,
+  actorPermissions: string[] = [],
 ) => {
   const user = await prisma.user.findFirst({
     where: {
@@ -486,7 +494,8 @@ const getUserById = async (
     throw new AppError(httpStatus.NOT_FOUND, "User not found");
   }
 
-  if (userRole === "CLIENT" && actorUserId && user.id !== actorUserId) {
+  const isStaffActor = hasStaffCapabilities(actorPermissions, userRole);
+  if (!isStaffActor && actorUserId && user.id !== actorUserId) {
     throw new AppError(httpStatus.FORBIDDEN, "You cannot access this user profile");
   }
 

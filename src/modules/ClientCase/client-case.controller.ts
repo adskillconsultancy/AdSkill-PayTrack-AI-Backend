@@ -3,8 +3,9 @@ import httpStatus from "http-status";
 import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { ClientCaseService } from "./client-case.service";
+import { hasStaffCapabilities } from "../../shared/role.helpers";
 
-const isStaff = (req: Request) => req.user?.role !== "CLIENT";
+const isStaff = (req: Request) => hasStaffCapabilities(req.user?.permissions, req.user?.role);
 
 
 const createClientCase = catchAsync(async (req: Request, res: Response) => {
@@ -13,6 +14,7 @@ const createClientCase = catchAsync(async (req: Request, res: Response) => {
     req.user!.id,
     req.user?.role,
     req.user?.email,
+    req.user?.permissions || [],
   );
   sendResponse(res, {
     statusCode: httpStatus.CREATED,
@@ -23,7 +25,11 @@ const createClientCase = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getMyCases = catchAsync(async (req: Request, res: Response) => {
-  const result = await ClientCaseService.getCasesForUser(req.user!.id, req.user?.role);
+  const result = await ClientCaseService.getCasesForUser(
+    req.user!.id,
+    req.user?.role,
+    req.user?.permissions || [],
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -33,7 +39,13 @@ const getMyCases = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getCaseById = catchAsync(async (req: Request, res: Response) => {
-  const result = await ClientCaseService.getCaseById(req.params.id, req.user!.id, isStaff(req), req.user?.role);
+  const result = await ClientCaseService.getCaseById(
+    req.params.id,
+    req.user!.id,
+    isStaff(req),
+    req.user?.role,
+    req.user?.permissions || [],
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
@@ -50,6 +62,7 @@ const updateCase = catchAsync(async (req: Request, res: Response) => {
     isStaff(req),
     req.user?.role,
     req.user?.email,
+    req.user?.permissions || [],
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -68,7 +81,12 @@ const getAllCases = catchAsync(async (req: Request, res: Response) => {
     startDate: req.query.startDate as string | undefined,
     endDate: req.query.endDate as string | undefined,
   };
-  const result = await ClientCaseService.getAllCases(req.user!.id, req.user?.role, filters);
+  const result = await ClientCaseService.getAllCases(
+    req.user!.id,
+    req.user?.role,
+    filters,
+    req.user?.permissions || [],
+  );
   sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
