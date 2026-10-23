@@ -1,5 +1,8 @@
 export const PERMISSIONS = {
   SERVICE_READ: "service:read",
+  SERVICE_CREATE: "service:create",
+  SERVICE_UPDATE: "service:update",
+  SERVICE_DELETE: "service:delete",
   SERVICE_MANAGE: "service:manage",
 } as const;
 

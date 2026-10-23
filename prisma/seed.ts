@@ -13,7 +13,10 @@ export const CANONICAL_PERMISSIONS = [
 
   // Service Catalog
   { name: "service:read", module: "SERVICE", description: "View services and base fees" },
-  { name: "service:manage", module: "SERVICE", description: "Create and edit service catalog offerings" },
+  { name: "service:create", module: "SERVICE", description: "Create service catalog offerings" },
+  { name: "service:update", module: "SERVICE", description: "Update existing service offerings & base fees" },
+  { name: "service:delete", module: "SERVICE", description: "Archive or delete services" },
+  { name: "service:manage", module: "SERVICE", description: "Manage service catalog offerings and categories" },
 
   // Client Cases
   { name: "case:create", module: "CASE", description: "Create client service cases" },
@@ -43,7 +46,9 @@ export const CANONICAL_PERMISSIONS = [
   // Documents
   { name: "document:read", module: "DOCUMENT", description: "View private case documents" },
   { name: "document:upload", module: "DOCUMENT", description: "Upload private case documents" },
+  { name: "document:update", module: "DOCUMENT", description: "Update document metadata, name, or classification" },
   { name: "document:delete", module: "DOCUMENT", description: "Remove private case documents" },
+  { name: "document:manage", module: "DOCUMENT", description: "Manage and review private case documents" },
 
   // Reports & Financial Intelligence
   { name: "report:view", module: "REPORT", description: "View management dashboard financial metrics" },
@@ -55,6 +60,9 @@ export const CANONICAL_PERMISSIONS = [
   // Case Notes & Collaboration
   { name: "note:read", module: "NOTE", description: "View client-visible notes" },
   { name: "note:create", module: "NOTE", description: "Create client or internal notes" },
+  { name: "note:update", module: "NOTE", description: "Edit existing case notes" },
+  { name: "note:delete", module: "NOTE", description: "Delete case notes" },
+  { name: "note:manage", module: "NOTE", description: "Manage case notes, pinning, and moderation" },
   { name: "note:read-internal", module: "NOTE", description: "View confidential internal staff notes" },
 
   // Support & Client Communication Desk

@@ -7,10 +7,10 @@ import { ServiceValidation } from "./service.validation";
 
 const router = Router();
 
-// Create a new service offering (Requires 'service:manage' permission; Super Admin)
+// Create a new service offering (Requires 'service:create' or 'service:manage' permission; Super Admin)
 router.post(
   "/",
-  auth(PERMISSIONS.SERVICE_MANAGE),
+  auth(PERMISSIONS.SERVICE_CREATE, PERMISSIONS.SERVICE_MANAGE),
   validateRequest(ServiceValidation.createServiceValidationSchema),
   ServiceController.createService,
 );
@@ -30,18 +30,18 @@ router.get(
   ServiceController.getServiceById,
 );
 
-// Update service by ID (Requires 'service:manage' permission; Super Admin)
+// Update service by ID (Requires 'service:update' or 'service:manage' permission; Super Admin)
 router.patch(
   "/:id",
-  auth(PERMISSIONS.SERVICE_MANAGE),
+  auth(PERMISSIONS.SERVICE_UPDATE, PERMISSIONS.SERVICE_MANAGE),
   validateRequest(ServiceValidation.updateServiceValidationSchema),
   ServiceController.updateService,
 );
 
-// Soft delete service by ID (Requires 'service:manage' permission; Super Admin)
+// Soft delete service by ID (Requires 'service:delete' or 'service:manage' permission; Super Admin)
 router.delete(
   "/:id",
-  auth(PERMISSIONS.SERVICE_MANAGE),
+  auth(PERMISSIONS.SERVICE_DELETE, PERMISSIONS.SERVICE_MANAGE),
   ServiceController.deleteService,
 );
 

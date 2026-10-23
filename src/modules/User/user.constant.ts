@@ -18,6 +18,9 @@ export const PERMISSIONS = {
 
   // Service Catalog
   SERVICE_READ: "service:read",
+  SERVICE_CREATE: "service:create",
+  SERVICE_UPDATE: "service:update",
+  SERVICE_DELETE: "service:delete",
   SERVICE_MANAGE: "service:manage",
 
   // Client Cases
@@ -48,7 +51,9 @@ export const PERMISSIONS = {
   // Documents
   DOCUMENT_READ: "document:read",
   DOCUMENT_UPLOAD: "document:upload",
+  DOCUMENT_UPDATE: "document:update",
   DOCUMENT_DELETE: "document:delete",
+  DOCUMENT_MANAGE: "document:manage",
 
   // Reports & Analytics
   REPORT_VIEW: "report:view",
@@ -60,6 +65,9 @@ export const PERMISSIONS = {
   // Case Notes
   NOTE_READ: "note:read",
   NOTE_CREATE: "note:create",
+  NOTE_UPDATE: "note:update",
+  NOTE_DELETE: "note:delete",
+  NOTE_MANAGE: "note:manage",
   NOTE_READ_INTERNAL: "note:read-internal",
 
   // Support & Messenger

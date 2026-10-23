@@ -22,14 +22,14 @@ router.get(
 
 router.patch(
   "/:id",
-  auth(PERMISSIONS.NOTE_CREATE),
+  auth(PERMISSIONS.NOTE_UPDATE, PERMISSIONS.NOTE_MANAGE),
   validateRequest(CaseNoteValidation.updateCaseNoteSchema),
   CaseNoteController.updateNote,
 );
 
 router.delete(
   "/:id",
-  auth(PERMISSIONS.NOTE_CREATE),
+  auth(PERMISSIONS.NOTE_DELETE, PERMISSIONS.NOTE_MANAGE),
   CaseNoteController.deleteNote,
 );
 

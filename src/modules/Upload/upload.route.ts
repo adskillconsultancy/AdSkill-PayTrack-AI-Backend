@@ -10,14 +10,14 @@ const router = Router();
 
 router.post(
   "/document",
-  auth(PERMISSIONS.DOCUMENT_UPLOAD),
+  auth(PERMISSIONS.DOCUMENT_UPLOAD, PERMISSIONS.DOCUMENT_MANAGE),
   upload.single("file"),
   UploadController.uploadDocument,
 );
 
 router.post(
   "/cases/:caseId/documents",
-  auth(PERMISSIONS.DOCUMENT_UPLOAD),
+  auth(PERMISSIONS.DOCUMENT_UPLOAD, PERMISSIONS.DOCUMENT_MANAGE),
   upload.array("files", 10),
   validateRequest(UploadValidation.caseDocumentsValidationSchema),
   UploadController.uploadCaseDocuments,
@@ -39,7 +39,7 @@ router.get(
 
 router.delete(
   "/documents/:documentId",
-  auth(PERMISSIONS.DOCUMENT_DELETE),
+  auth(PERMISSIONS.DOCUMENT_DELETE, PERMISSIONS.DOCUMENT_MANAGE),
   validateRequest(UploadValidation.documentDeleteValidationSchema),
   UploadController.deleteDocument,
 );
