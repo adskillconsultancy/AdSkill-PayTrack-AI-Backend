@@ -1,4 +1,4 @@
-import { LeadStatus } from "@prisma/client";
+import { CallOutcome, LeadActivityType, LeadStatus } from "@prisma/client";
 import prisma from "../lib/prisma";
 
 interface RawLeadData {
@@ -1755,29 +1755,99 @@ const RAW_LEADS: RawLeadData[] = [
   },
 ];
 
-function mapStatus(status: string): LeadStatus {
-  switch (status.trim().toLowerCase()) {
-    case "new lead":
-      return LeadStatus.NEW;
-    case "in discussion":
-      return LeadStatus.IN_PROGRESS;
-    case "documents pending":
-      return LeadStatus.DOCUMENTS_PENDING;
-    case "meeting scheduled":
-      return LeadStatus.MEETING_SCHEDULED;
-    case "converted - engaged":
-      return LeadStatus.ENGAGED;
-    case "closed - won":
-      return LeadStatus.CONVERTED;
-    case "closed - lost":
-      return LeadStatus.LOST;
-    case "not interested":
-      return LeadStatus.NOT_INTERESTED;
-    case "follow-up required":
-      return LeadStatus.FOLLOW_UP;
-    default:
-      return LeadStatus.NEW;
+function determineLeadStatus(raw: RawLeadData): LeadStatus {
+  const rawStatus = (raw.status || "").trim().toLowerCase();
+  const remarks = (raw.remarks || "").toLowerCase();
+  const summary = (raw.evaluationNotes || "").toLowerCase();
+  const assessment = (raw.profileAssessment || "").toLowerCase();
+
+  // 1. Explicitly Engaged / Converted
+  if (
+    rawStatus.includes("converted") ||
+    rawStatus.includes("engaged") ||
+    rawStatus.includes("closed - won")
+  ) {
+    return LeadStatus.ENGAGED;
   }
+
+  // 2. Lost / Not Interested / Dropped Out
+  if (
+    raw.clientCode === "AC-0060" || // Robinson Espinosa: chose another agency
+    remarks.includes("not interested anymore") ||
+    summary.includes("not interested anymore") ||
+    remarks.includes("will not proceed") ||
+    summary.includes("will not proceed") ||
+    rawStatus.includes("closed - lost") ||
+    rawStatus.includes("not interested")
+  ) {
+    if (
+      remarks.includes("not interested") ||
+      summary.includes("not interested")
+    ) {
+      return LeadStatus.NOT_INTERESTED;
+    }
+    return LeadStatus.LOST;
+  }
+
+  // 3. Meeting Scheduled: Confirmed consultation meeting with date/time
+  const meetingSchedLower = (raw.meetingScheduled || "").toLowerCase();
+  const meetingTime = (raw.meetingDateTimeStr || "").trim();
+  const hasValidMeeting =
+    (meetingSchedLower === "yes" || meetingSchedLower === "tentative") &&
+    meetingTime !== "" &&
+    !meetingTime.toLowerCase().includes("already done") &&
+    !remarks.toLowerCase().includes("not attend the meeting");
+
+  if (hasValidMeeting) {
+    return LeadStatus.MEETING_SCHEDULED;
+  }
+
+  // 4. Follow Up Required (e.g. missed meeting or need to call back)
+  if (
+    remarks.includes("not attend the meeting") ||
+    remarks.includes("have to call again") ||
+    rawStatus.includes("follow-up")
+  ) {
+    return LeadStatus.FOLLOW_UP;
+  }
+
+  // 5. In Progress / In Discussion / Case Evaluation & Proposal Sent
+  if (
+    rawStatus.includes("in discussion") ||
+    rawStatus.includes("in progress") ||
+    remarks.includes("sent email") ||
+    remarks.includes("sent checklist") ||
+    remarks.includes("sent the agreement") ||
+    remarks.includes("sent him meeting link") ||
+    remarks.includes("price breakdown") ||
+    remarks.includes("planning to apply") ||
+    summary.includes("dear mr") ||
+    summary.includes("dear dr") ||
+    summary.includes("dear ms") ||
+    summary.includes("our professional fee") ||
+    summary.includes("we have completed") ||
+    summary.includes("thank you for") ||
+    summary.includes("we are accepting") ||
+    summary.includes("he scheduled a meeting") ||
+    summary.includes("sent the price breakdown") ||
+    summary.includes("we have to send eb-3 aggrement") ||
+    (assessment.includes("strong - eligible") &&
+      raw.evaluationNotes &&
+      raw.evaluationNotes.length > 50)
+  ) {
+    return LeadStatus.IN_PROGRESS;
+  }
+
+  // 6. Documents Pending
+  if (
+    rawStatus.includes("documents pending") ||
+    remarks.includes("waiting for documents")
+  ) {
+    return LeadStatus.DOCUMENTS_PENDING;
+  }
+
+  // 7. Default to NEW
+  return LeadStatus.NEW;
 }
 
 function parseCustomDate(dStr?: string): Date | null {
@@ -1797,7 +1867,7 @@ function parseCustomDate(dStr?: string): Date | null {
 }
 
 async function seedLeads() {
-  console.log("🚀 Starting import of 91 CRM leads from boss's workbook...");
+  console.log("🚀 Starting import of 91 CRM leads from workbook...");
 
   // Load all services from database for matching
   const allServices = await prisma.service.findMany({
@@ -1813,107 +1883,222 @@ async function seedLeads() {
   });
   console.log("SuperAdmin:", superAdmin?.name || "None");
 
-  let createdCount = 0;
-  let updatedCount = 0;
+  // Step 1: Clean up previous system import activities in a single query
+  console.log("🧹 Clearing old system import activities...");
+  await prisma.leadActivity.deleteMany({
+    where: {
+      performedByName: { in: ["Intake Specialist", "System Import"] },
+    },
+  });
 
-  for (const raw of RAW_LEADS) {
-    console.log(`Importing [${raw.clientCode}] ${raw.clientName}...`);
-    // Match service
-    const serviceNorm = raw.serviceType.toUpperCase();
-    const matchedService = allServices.find((s) => {
-      const codeUpper = s.code.toUpperCase();
-      const nameUpper = s.name.toUpperCase();
-      if (
-        serviceNorm === "EB-2 NIW" &&
-        (codeUpper.includes("EB2") || nameUpper.includes("EB-2 NIW"))
-      )
-        return true;
-      if (
-        serviceNorm === "EB-1A" &&
-        (codeUpper.includes("EB1") || nameUpper.includes("EB-1A"))
-      )
-        return true;
-      if (
-        serviceNorm === "EB-3" &&
-        (codeUpper === "EB-3" || nameUpper.startsWith("EB-3"))
-      )
-        return true;
-      if (
-        serviceNorm === "E-2" &&
-        (codeUpper === "E-2" || nameUpper.startsWith("E-2"))
-      )
-        return true;
-      if (
-        serviceNorm === "L-1A" &&
-        (codeUpper.includes("L-1") || nameUpper.includes("L-1A"))
-      )
-        return true;
-      if (
-        serviceNorm === "EB-5" &&
-        (codeUpper.includes("EB-5") || nameUpper.includes("EB-5"))
-      )
-        return true;
-      if (
-        serviceNorm.includes("FAMILY") &&
-        (codeUpper.includes("FAM") || nameUpper.includes("Family"))
-      )
-        return true;
-      if (
-        serviceNorm.includes("CONSULTATION") &&
-        (codeUpper.includes("CONSULT") || nameUpper.includes("Consultation"))
-      )
-        return true;
-      return nameUpper.includes(serviceNorm) || codeUpper.includes(serviceNorm);
-    });
-
-    const parsedDate = parseCustomDate(raw.dateStr) || new Date();
-    const parsedFollowUp = parseCustomDate(raw.nextFollowUpDateStr);
-
-    const leadData = {
-      entryNumber: raw.entryNumber,
-      clientCode: raw.clientCode,
-      fullName: raw.clientName,
-      phone: raw.clientPhone || "No Phone Provided",
-      email: raw.clientEmail || null,
-      serviceId: matchedService ? matchedService.id : null,
-      leadSource: raw.leadSource || "WhatsApp",
-      whatClientWants: raw.whatClientWants || null,
-      whatEmployeeDiscussed: raw.whatEmployeeDiscussed || null,
-      resumeUrl: raw.resumeUrl || null,
-      profileAssessment: raw.profileAssessment || "Pending Evaluation",
-      meetingScheduled:
-        raw.meetingScheduled || (raw.meetingDateTimeStr ? "Yes" : "No"),
-      meetingDateTimeStr: raw.meetingDateTimeStr || null,
-      status: mapStatus(raw.status),
-      nextFollowUpDate: parsedFollowUp,
-      priority: raw.priority ? raw.priority.toUpperCase() : "MEDIUM",
-      remarks: raw.remarks === "N/A" ? null : raw.remarks || null,
-      evaluationNotes: raw.evaluationNotes || null,
-      createdById: superAdmin?.id || null,
-      createdByName: superAdmin?.name || "System Import",
-      createdAt: parsedDate,
-    };
-
-    const existing = await prisma.lead.findUnique({
-      where: { clientCode: raw.clientCode },
-    });
-
-    if (existing) {
-      await prisma.lead.update({
-        where: { id: existing.id },
-        data: leadData,
-      });
-      updatedCount++;
-    } else {
-      await prisma.lead.create({
-        data: leadData,
-      });
-      createdCount++;
-    }
+  // Step 2: Fetch existing leads into memory map
+  const existingLeads = await prisma.lead.findMany({
+    select: { id: true, clientCode: true },
+  });
+  const leadIdMap = new Map<string, string>();
+  for (const l of existingLeads) {
+    if (l.clientCode) leadIdMap.set(l.clientCode, l.id);
   }
 
+  const allActivitiesToCreate: any[] = [];
+  let processedCount = 0;
+
+  // Process leads in parallel chunks of 10 for blazing fast upserts
+  const chunkSize = 10;
+  for (let i = 0; i < RAW_LEADS.length; i += chunkSize) {
+    const chunk = RAW_LEADS.slice(i, i + chunkSize);
+
+    await Promise.all(
+      chunk.map(async (raw) => {
+        // Match service
+        const serviceNorm = raw.serviceType.toUpperCase();
+        const matchedService = allServices.find((s) => {
+          const codeUpper = s.code.toUpperCase();
+          const nameUpper = s.name.toUpperCase();
+          if (
+            serviceNorm === "EB-2 NIW" &&
+            (codeUpper.includes("EB2") || nameUpper.includes("EB-2 NIW"))
+          )
+            return true;
+          if (
+            serviceNorm === "EB-1A" &&
+            (codeUpper.includes("EB1") || nameUpper.includes("EB-1A"))
+          )
+            return true;
+          if (
+            serviceNorm === "EB-3" &&
+            (codeUpper === "EB-3" || nameUpper.startsWith("EB-3"))
+          )
+            return true;
+          if (
+            serviceNorm === "E-2" &&
+            (codeUpper === "E-2" || nameUpper.startsWith("E-2"))
+          )
+            return true;
+          if (
+            serviceNorm === "L-1A" &&
+            (codeUpper.includes("L-1") || nameUpper.includes("L-1A"))
+          )
+            return true;
+          if (
+            serviceNorm === "EB-5" &&
+            (codeUpper.includes("EB-5") || nameUpper.includes("EB-5"))
+          )
+            return true;
+          if (
+            serviceNorm.includes("FAMILY") &&
+            (codeUpper.includes("FAM") || nameUpper.includes("Family"))
+          )
+            return true;
+          if (
+            serviceNorm.includes("CONSULTATION") &&
+            (codeUpper.includes("CONSULT") || nameUpper.includes("Consultation"))
+          )
+            return true;
+          return (
+            nameUpper.includes(serviceNorm) || codeUpper.includes(serviceNorm)
+          );
+        });
+
+        const parsedDate = parseCustomDate(raw.dateStr) || new Date();
+        const parsedFollowUp = parseCustomDate(raw.nextFollowUpDateStr);
+        const finalStatus = determineLeadStatus(raw);
+
+        const leadData = {
+          entryNumber: raw.entryNumber,
+          clientCode: raw.clientCode,
+          fullName: raw.clientName,
+          phone: raw.clientPhone || "No Phone Provided",
+          email: raw.clientEmail || null,
+          serviceId: matchedService ? matchedService.id : null,
+          leadSource: raw.leadSource || "WhatsApp",
+          whatClientWants: raw.whatClientWants || null,
+          resumeUrl: raw.resumeUrl || null,
+          profileAssessment: raw.profileAssessment || "Pending Evaluation",
+          meetingScheduled:
+            raw.meetingScheduled || (raw.meetingDateTimeStr ? "Yes" : "No"),
+          meetingDateTimeStr: raw.meetingDateTimeStr || null,
+          status: finalStatus,
+          nextFollowUpDate: parsedFollowUp,
+          priority: raw.priority ? raw.priority.toUpperCase() : "MEDIUM",
+          remarks: raw.remarks === "N/A" ? null : raw.remarks || null,
+          evaluationNotes: raw.evaluationNotes || null,
+          createdById: superAdmin?.id || null,
+          createdByName: superAdmin?.name || "System Import",
+          createdAt: parsedDate,
+        };
+
+        let leadId = leadIdMap.get(raw.clientCode);
+        if (leadId) {
+          await prisma.lead.update({
+            where: { id: leadId },
+            data: leadData,
+          });
+        } else {
+          const created = await prisma.lead.create({
+            data: leadData,
+          });
+          leadId = created.id;
+          leadIdMap.set(raw.clientCode, leadId);
+        }
+
+        // Build CRM Activity Note with Summary FIRST as explicitly requested
+        const noteSections: string[] = [];
+
+        // 1. Summary & Preliminary Case Assessment (FIRST)
+        if (
+          raw.evaluationNotes &&
+          raw.evaluationNotes.trim() &&
+          raw.evaluationNotes.trim() !== "N/A"
+        ) {
+          noteSections.push(
+            `📋 Summary & Preliminary Case Assessment:\n${raw.evaluationNotes.trim()}`,
+          );
+        }
+
+        // 2. Remarks / Internal Notes
+        if (raw.remarks && raw.remarks.trim() && raw.remarks.trim() !== "N/A") {
+          noteSections.push(`📌 Remarks & Staff Notes:\n${raw.remarks.trim()}`);
+        }
+
+        // 3. What Staff Discussed / Advised
+        if (
+          raw.whatEmployeeDiscussed &&
+          raw.whatEmployeeDiscussed.trim() &&
+          raw.whatEmployeeDiscussed.trim() !== "N/A"
+        ) {
+          noteSections.push(
+            `💬 What Staff Discussed / Advised:\n${raw.whatEmployeeDiscussed.trim()}`,
+          );
+        }
+
+        // 4. What Client Wants / Goals
+        if (
+          raw.whatClientWants &&
+          raw.whatClientWants.trim() &&
+          raw.whatClientWants.trim() !== "N/A"
+        ) {
+          noteSections.push(
+            `🎯 What Client Wants:\n${raw.whatClientWants.trim()}`,
+          );
+        }
+
+        // 5. Meeting Scheduled & Details
+        if (
+          raw.meetingDateTimeStr &&
+          raw.meetingDateTimeStr.trim() &&
+          raw.meetingDateTimeStr.trim() !== "N/A"
+        ) {
+          noteSections.push(
+            `📅 Consultation Meeting: ${raw.meetingDateTimeStr.trim()} (${raw.meetingScheduled || "Confirmed"})`,
+          );
+        } else if (
+          raw.meetingScheduled &&
+          raw.meetingScheduled.trim() !== "No" &&
+          raw.meetingScheduled.trim() !== "N/A"
+        ) {
+          noteSections.push(
+            `📅 Consultation Meeting: ${raw.meetingScheduled.trim()}`,
+          );
+        }
+
+        const header = `[Entry #${raw.entryNumber} • ${raw.leadSource || "WhatsApp"} Client Interaction Log]`;
+        const fullNotes = `${header}\n\n${noteSections.join("\n\n")}`;
+
+        const actType = raw.leadSource?.toLowerCase().includes("whatsapp")
+          ? LeadActivityType.WHATSAPP
+          : raw.leadSource?.toLowerCase().includes("email")
+            ? LeadActivityType.EMAIL
+            : LeadActivityType.CALL;
+
+        allActivitiesToCreate.push({
+          leadId,
+          activityType: actType,
+          callOutcome: CallOutcome.ANSWERED,
+          notes: fullNotes,
+          nextFollowUp: parsedFollowUp,
+          performedById: superAdmin?.id || null,
+          performedByName: "Intake Specialist",
+          createdAt: parsedDate,
+        });
+
+        processedCount++;
+      }),
+    );
+
+    console.log(`Synced ${processedCount}/${RAW_LEADS.length} leads...`);
+  }
+
+  // Step 3: Insert all CRM Activities in a single bulk query
   console.log(
-    `✅ Successfully seeded leads: ${createdCount} created, ${updatedCount} updated. Total 91 processed!`,
+    `📝 Bulk inserting ${allActivitiesToCreate.length} CRM timeline activities...`,
+  );
+  await prisma.leadActivity.createMany({
+    data: allActivitiesToCreate,
+  });
+
+  console.log(
+    `✅ Successfully seeded all ${RAW_LEADS.length} leads and ${allActivitiesToCreate.length} CRM activities!`,
   );
 }
 

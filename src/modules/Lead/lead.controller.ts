@@ -90,6 +90,32 @@ const addLeadActivity = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateLeadActivity = catchAsync(async (req: Request, res: Response) => {
+  const { activityId } = req.params;
+  const user = req.user ? { id: req.user.id, name: req.user.name || req.user.email, email: req.user.email } : undefined;
+  const result = await LeadService.updateLeadActivity(activityId, req.body, user);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Lead activity updated successfully",
+    data: result,
+  });
+});
+
+const deleteLeadActivity = catchAsync(async (req: Request, res: Response) => {
+  const { activityId } = req.params;
+  const user = req.user ? { id: req.user.id, name: req.user.name || req.user.email, email: req.user.email } : undefined;
+  const result = await LeadService.deleteLeadActivity(activityId, user);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Lead activity deleted successfully",
+    data: result,
+  });
+});
+
 const deleteLead = catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
   const result = await LeadService.deleteLead(id);
@@ -167,6 +193,8 @@ export const LeadController = {
   getLeadById,
   updateLead,
   addLeadActivity,
+  updateLeadActivity,
+  deleteLeadActivity,
   deleteLead,
   getLeadSummaryStats,
   getFollowUpQueue,

@@ -75,7 +75,31 @@ router.post(
   LeadController.addLeadActivity,
 );
 
-// 8. Delete lead (soft delete)
+// 10. Update lead activity log
+router.patch(
+  "/activities/:activityId",
+  auth(),
+  LeadController.updateLeadActivity,
+);
+router.patch(
+  "/:id/activities/:activityId",
+  auth(),
+  LeadController.updateLeadActivity,
+);
+
+// 11. Delete lead activity log
+router.delete(
+  "/activities/:activityId",
+  auth(),
+  LeadController.deleteLeadActivity,
+);
+router.delete(
+  "/:id/activities/:activityId",
+  auth(),
+  LeadController.deleteLeadActivity,
+);
+
+// 12. Delete lead (soft delete)
 router.delete(
   "/:id",
   auth(),

@@ -793,7 +793,6 @@ model Lead {
   clientCode         String?      @unique
   leadSource         String?
   whatClientWants    String?      @db.Text
-  whatEmployeeDiscussed String?   @db.Text
   resumeUrl          String?
   profileAssessment  String?      // Strong - Eligible, Moderate - Needs More Documentation, Weak - Not Currently Eligible, Needs Further Review, Pending Evaluation
   meetingScheduled   String?      // Yes, No, Tentative

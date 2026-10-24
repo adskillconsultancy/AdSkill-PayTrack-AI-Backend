@@ -1,4 +1,4 @@
-import { LeadActivityType, LeadStatus, Prisma } from "@prisma/client";
+import { CallOutcome, LeadActivityType, LeadStatus, Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
@@ -37,7 +37,6 @@ const leadSelect = {
   status: true,
   leadSource: true,
   whatClientWants: true,
-  whatEmployeeDiscussed: true,
   resumeUrl: true,
   profileAssessment: true,
   meetingScheduled: true,
@@ -119,7 +118,6 @@ const createLead = async (
     entryNumber,
     leadSource,
     whatClientWants,
-    whatEmployeeDiscussed,
     resumeUrl,
     profileAssessment,
     meetingScheduled,
@@ -197,7 +195,6 @@ const createLead = async (
         referralName: referralName || null,
         leadSource: leadSource || null,
         whatClientWants: whatClientWants || null,
-        whatEmployeeDiscussed: whatEmployeeDiscussed || null,
         resumeUrl: resumeUrl || null,
         profileAssessment: profileAssessment || null,
         meetingScheduled: meetingScheduled || null,
@@ -443,7 +440,6 @@ const updateLead = async (
     if (payload.entryNumber !== undefined) leadUpdateData.entryNumber = payload.entryNumber;
     if (payload.leadSource !== undefined) leadUpdateData.leadSource = payload.leadSource;
     if (payload.whatClientWants !== undefined) leadUpdateData.whatClientWants = payload.whatClientWants;
-    if (payload.whatEmployeeDiscussed !== undefined) leadUpdateData.whatEmployeeDiscussed = payload.whatEmployeeDiscussed;
     if (payload.resumeUrl !== undefined) leadUpdateData.resumeUrl = payload.resumeUrl;
     if (payload.profileAssessment !== undefined) leadUpdateData.profileAssessment = payload.profileAssessment;
     if (payload.meetingScheduled !== undefined) leadUpdateData.meetingScheduled = payload.meetingScheduled;
@@ -602,6 +598,61 @@ const addLeadActivity = async (
   });
 
   return result;
+};
+
+// 6. Update Lead Activity Log
+const updateLeadActivity = async (
+  activityId: string,
+  payload: { notes?: string; callOutcome?: CallOutcome; nextFollowUp?: string | null },
+  user?: { id: string; name: string; email: string },
+) => {
+  const activity = await prisma.leadActivity.findUnique({
+    where: { id: activityId },
+  });
+
+  if (!activity) {
+    throw new AppError(httpStatus.NOT_FOUND, "Lead activity not found");
+  }
+
+  const updated = await prisma.leadActivity.update({
+    where: { id: activityId },
+    data: {
+      notes: payload.notes !== undefined ? payload.notes : activity.notes,
+      callOutcome: payload.callOutcome !== undefined ? payload.callOutcome : activity.callOutcome,
+      nextFollowUp: payload.nextFollowUp !== undefined ? (payload.nextFollowUp ? new Date(payload.nextFollowUp) : null) : activity.nextFollowUp,
+    },
+    include: {
+      performedBy: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
+  });
+
+  return updated;
+};
+
+// 7. Delete Lead Activity Log
+const deleteLeadActivity = async (
+  activityId: string,
+  user?: { id: string; name: string; email: string },
+) => {
+  const activity = await prisma.leadActivity.findUnique({
+    where: { id: activityId },
+  });
+
+  if (!activity) {
+    throw new AppError(httpStatus.NOT_FOUND, "Lead activity not found");
+  }
+
+  const deleted = await prisma.leadActivity.delete({
+    where: { id: activityId },
+  });
+
+  return deleted;
 };
 
 // 6. Delete Lead (Soft Delete)
@@ -951,6 +1002,8 @@ export const LeadService = {
   getLeadById,
   updateLead,
   addLeadActivity,
+  updateLeadActivity,
+  deleteLeadActivity,
   deleteLead,
   getLeadSummaryStats,
   getFollowUpQueue,

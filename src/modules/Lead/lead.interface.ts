@@ -17,7 +17,6 @@ export interface TCreateLeadPayload {
   entryNumber?: number;
   leadSource?: string;
   whatClientWants?: string;
-  whatEmployeeDiscussed?: string;
   resumeUrl?: string;
   profileAssessment?: string;
   meetingScheduled?: string;
@@ -45,7 +44,6 @@ export interface TUpdateLeadPayload {
   entryNumber?: number;
   leadSource?: string;
   whatClientWants?: string;
-  whatEmployeeDiscussed?: string;
   resumeUrl?: string;
   profileAssessment?: string;
   meetingScheduled?: string;
