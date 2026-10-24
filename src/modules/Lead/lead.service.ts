@@ -754,9 +754,17 @@ const getFollowUpQueue = async (
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
   const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
-  // Base conditions for leads in the queue
+  // Base conditions for leads in the queue:
+  // Must either have an explicit nextFollowUpDate scheduled, or have status === FOLLOW_UP, or be marked as completed follow-up.
   const baseConditions: Prisma.LeadWhereInput[] = [
     { isDeleted: false },
+    {
+      OR: [
+        { nextFollowUpDate: { not: null } },
+        { status: LeadStatus.FOLLOW_UP },
+        { isFollowUpDone: true },
+      ],
+    },
   ];
 
   // Role scoping: if not privileged (SUPER_ADMIN / ADMIN), strictly restrict to assignedToId
@@ -787,7 +795,7 @@ const getFollowUpQueue = async (
     isFollowUpDone: false,
     OR: [
       { nextFollowUpDate: { lt: startOfToday } },
-      { nextFollowUpDate: null },
+      { nextFollowUpDate: null, status: LeadStatus.FOLLOW_UP },
     ],
   };
 
