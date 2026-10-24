@@ -910,8 +910,8 @@ const getFollowUpQueue = async (
       take: limit,
       orderBy: [
         { isFollowUpDone: "asc" }, // Incomplete (false) first, completed (true) last
-        { nextFollowUpDate: "asc" }, // Earliest due date first
-        { createdAt: "desc" },
+        { createdAt: "desc" },     // Newest leads first
+        { nextFollowUpDate: "desc" },
       ],
     }),
     prisma.lead.count({ where: whereConditions }),
