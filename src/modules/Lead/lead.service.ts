@@ -769,11 +769,8 @@ const getFollowUpQueue = async (
         },
   ];
 
-  // Role scoping: if not privileged (SUPER_ADMIN / ADMIN), strictly restrict to assignedToId
-  const isPrivileged = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
-  if (!isPrivileged) {
-    baseConditions.push({ assignedToId: user.id });
-  } else if (assignedToId) {
+  // Filter by assigned staff (open to all staff members so team can cover each other's follow-ups)
+  if (assignedToId) {
     if (assignedToId === "UNASSIGNED") {
       baseConditions.push({ assignedToId: null });
     } else {
@@ -910,11 +907,16 @@ const getFollowUpQueue = async (
       },
       skip,
       take: limit,
-      orderBy: [
-        { isFollowUpDone: "asc" }, // Incomplete (false) first, completed (true) last
-        { createdAt: "desc" },     // Newest leads first
-        { nextFollowUpDate: "desc" },
-      ],
+      orderBy: filters.sortBy
+        ? [
+            { isFollowUpDone: "asc" },
+            { [filters.sortBy]: filters.sortOrder || "desc" },
+          ]
+        : [
+            { isFollowUpDone: "asc" }, // Incomplete (false) first, completed (true) last
+            { createdAt: "desc" },     // Newest leads first
+            { nextFollowUpDate: "desc" },
+          ],
     }),
     prisma.lead.count({ where: whereConditions }),
   ]);

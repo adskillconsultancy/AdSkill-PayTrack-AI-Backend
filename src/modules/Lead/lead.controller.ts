@@ -150,6 +150,8 @@ const getFollowUpQueue = catchAsync(async (req: Request, res: Response) => {
     urgency: req.query.urgency as "OVERDUE" | "TODAY" | "UPCOMING" | "ALL" | undefined,
     assignedToId: req.query.assignedToId as string | undefined,
     searchTerm: (req.query.searchTerm || req.query.search) as string | undefined,
+    sortBy: req.query.sortBy as string | undefined,
+    sortOrder: req.query.sortOrder as "asc" | "desc" | undefined,
   };
 
   const paginationOptions = {

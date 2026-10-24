@@ -79,6 +79,8 @@ export interface TFollowUpFilterRequest {
   urgency?: "OVERDUE" | "TODAY" | "UPCOMING" | "COMPLETED" | "ALL";
   assignedToId?: string;
   searchTerm?: string;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
 }
 
 export interface TCompleteFollowUpPayload {
