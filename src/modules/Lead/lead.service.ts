@@ -26,6 +26,8 @@ import {
 // Standard projection for leads
 const leadSelect = {
   id: true,
+  clientCode: true,
+  entryNumber: true,
   fullName: true,
   phone: true,
   email: true,
@@ -33,6 +35,18 @@ const leadSelect = {
   country: true,
   referralName: true,
   status: true,
+  leadSource: true,
+  whatClientWants: true,
+  whatEmployeeDiscussed: true,
+  resumeUrl: true,
+  profileAssessment: true,
+  meetingScheduled: true,
+  meetingDateTime: true,
+  meetingDateTimeStr: true,
+  meetingLocation: true,
+  priority: true,
+  remarks: true,
+  evaluationNotes: true,
   serviceId: true,
   service: {
     select: {
@@ -71,6 +85,8 @@ const leadSelect = {
   lastFollowUpAt: true,
   isFollowUpDone: true,
   followUpNotifiedAt: true,
+  meetingNotified4dAt: true,
+  meetingNotifiedDayAt: true,
   isDeleted: true,
   deletedAt: true,
   createdAt: true,
@@ -99,6 +115,20 @@ const createLead = async (
     assignedToId,
     createdByName,
     nextFollowUpDate,
+    clientCode,
+    entryNumber,
+    leadSource,
+    whatClientWants,
+    whatEmployeeDiscussed,
+    resumeUrl,
+    profileAssessment,
+    meetingScheduled,
+    meetingDateTime,
+    meetingDateTimeStr,
+    meetingLocation,
+    priority = "MEDIUM",
+    remarks,
+    evaluationNotes,
   } = payload;
 
   // Validate service if provided
@@ -128,6 +158,22 @@ const createLead = async (
     user?.name || createdByName || "Online Form";
   const creatorId = user?.id || null;
 
+  // Generate unique clientCode if not provided (AC-0001, AC-0002, etc.)
+  let finalClientCode = clientCode;
+  if (!finalClientCode) {
+    const highestLead = await prisma.lead.findFirst({
+      where: { clientCode: { startsWith: "AC-" } },
+      orderBy: { clientCode: "desc" },
+      select: { clientCode: true },
+    });
+    let nextNum = 1;
+    if (highestLead?.clientCode) {
+      const match = highestLead.clientCode.match(/AC-(\d+)/);
+      if (match) nextNum = parseInt(match[1], 10) + 1;
+    }
+    finalClientCode = `AC-${String(nextNum).padStart(4, "0")}`;
+  }
+
   // Determine initial follow-up date: default to 3 days later at 10:00 AM if not specified
   let initialFollowUpDate: Date | null = null;
   if (nextFollowUpDate) {
@@ -141,12 +187,26 @@ const createLead = async (
   const result = await prisma.$transaction(async (tx) => {
     const lead = await tx.lead.create({
       data: {
+        clientCode: finalClientCode,
+        entryNumber: entryNumber || null,
         fullName,
         phone,
         email: email || null,
         address: address || null,
         country: country || null,
         referralName: referralName || null,
+        leadSource: leadSource || null,
+        whatClientWants: whatClientWants || null,
+        whatEmployeeDiscussed: whatEmployeeDiscussed || null,
+        resumeUrl: resumeUrl || null,
+        profileAssessment: profileAssessment || null,
+        meetingScheduled: meetingScheduled || null,
+        meetingDateTime: meetingDateTime ? new Date(meetingDateTime) : null,
+        meetingDateTimeStr: meetingDateTimeStr || null,
+        meetingLocation: meetingLocation || null,
+        priority: priority || "MEDIUM",
+        remarks: remarks || null,
+        evaluationNotes: evaluationNotes || null,
         status,
         serviceId: serviceId || null,
         assignedToId: assignedToId || null,
@@ -160,8 +220,8 @@ const createLead = async (
 
     // Record initial system activity log
     const initialNote = assignedStaffName
-      ? `Lead created by ${creatorName} and assigned to ${assignedStaffName}.`
-      : `Lead created by ${creatorName}.`;
+      ? `Lead [${finalClientCode}] created by ${creatorName} and assigned to ${assignedStaffName}.`
+      : `Lead [${finalClientCode}] created by ${creatorName}.`;
 
     await tx.leadActivity.create({
       data: {
@@ -238,11 +298,20 @@ const getAllLeads = async (
       where: whereConditions,
       select: {
         id: true,
+        clientCode: true,
+        entryNumber: true,
         fullName: true,
         phone: true,
         email: true,
         country: true,
         status: true,
+        leadSource: true,
+        profileAssessment: true,
+        priority: true,
+        meetingScheduled: true,
+        meetingDateTime: true,
+        meetingDateTimeStr: true,
+        resumeUrl: true,
         serviceId: true,
         service: {
           select: {
@@ -369,6 +438,25 @@ const updateLead = async (
       assignedToId: payload.assignedToId === "" ? null : payload.assignedToId,
       status: payload.status,
     };
+
+    if (payload.clientCode !== undefined) leadUpdateData.clientCode = payload.clientCode;
+    if (payload.entryNumber !== undefined) leadUpdateData.entryNumber = payload.entryNumber;
+    if (payload.leadSource !== undefined) leadUpdateData.leadSource = payload.leadSource;
+    if (payload.whatClientWants !== undefined) leadUpdateData.whatClientWants = payload.whatClientWants;
+    if (payload.whatEmployeeDiscussed !== undefined) leadUpdateData.whatEmployeeDiscussed = payload.whatEmployeeDiscussed;
+    if (payload.resumeUrl !== undefined) leadUpdateData.resumeUrl = payload.resumeUrl;
+    if (payload.profileAssessment !== undefined) leadUpdateData.profileAssessment = payload.profileAssessment;
+    if (payload.meetingScheduled !== undefined) leadUpdateData.meetingScheduled = payload.meetingScheduled;
+    if (payload.priority !== undefined) leadUpdateData.priority = payload.priority;
+    if (payload.remarks !== undefined) leadUpdateData.remarks = payload.remarks;
+    if (payload.evaluationNotes !== undefined) leadUpdateData.evaluationNotes = payload.evaluationNotes;
+    if (payload.meetingDateTime !== undefined) {
+      leadUpdateData.meetingDateTime = payload.meetingDateTime ? new Date(payload.meetingDateTime) : null;
+      leadUpdateData.meetingNotified4dAt = null;
+      leadUpdateData.meetingNotifiedDayAt = null;
+    }
+    if (payload.meetingDateTimeStr !== undefined) leadUpdateData.meetingDateTimeStr = payload.meetingDateTimeStr;
+    if (payload.meetingLocation !== undefined) leadUpdateData.meetingLocation = payload.meetingLocation;
 
     if (payload.nextFollowUpDate !== undefined) {
       if (payload.nextFollowUpDate) {
@@ -698,11 +786,18 @@ const getFollowUpQueue = async (
       where: whereConditions,
       select: {
         id: true,
+        clientCode: true,
         fullName: true,
         phone: true,
         email: true,
         country: true,
         status: true,
+        priority: true,
+        profileAssessment: true,
+        meetingScheduled: true,
+        meetingDateTime: true,
+        meetingDateTimeStr: true,
+        resumeUrl: true,
         nextFollowUpDate: true,
         lastFollowUpAt: true,
         isFollowUpDone: true,

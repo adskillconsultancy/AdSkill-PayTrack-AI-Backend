@@ -1,9 +1,11 @@
 export const leadSearchableFields = [
+  "clientCode",
   "fullName",
   "phone",
   "email",
   "country",
   "referralName",
+  "leadSource",
 ];
 
 export const leadFilterableFields = [
@@ -14,6 +16,10 @@ export const leadFilterableFields = [
   "country",
   "startDate",
   "endDate",
+  "clientCode",
+  "priority",
+  "leadSource",
+  "profileAssessment",
 ];
 
 export const leadSortableFields = [
@@ -21,4 +27,9 @@ export const leadSortableFields = [
   "fullName",
   "status",
   "updatedAt",
+  "priority",
+  "nextFollowUpDate",
+  "meetingDateTime",
+  "entryNumber",
 ];
+

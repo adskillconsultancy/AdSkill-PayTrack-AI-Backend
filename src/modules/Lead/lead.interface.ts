@@ -13,6 +13,20 @@ export interface TCreateLeadPayload {
   createdById?: string;
   createdByName?: string;
   nextFollowUpDate?: string | Date;
+  clientCode?: string;
+  entryNumber?: number;
+  leadSource?: string;
+  whatClientWants?: string;
+  whatEmployeeDiscussed?: string;
+  resumeUrl?: string;
+  profileAssessment?: string;
+  meetingScheduled?: string;
+  meetingDateTime?: string | Date;
+  meetingDateTimeStr?: string;
+  meetingLocation?: string;
+  priority?: string;
+  remarks?: string;
+  evaluationNotes?: string;
 }
 
 export interface TUpdateLeadPayload {
@@ -27,6 +41,20 @@ export interface TUpdateLeadPayload {
   assignedToId?: string | null;
   nextFollowUpDate?: string | Date | null;
   isFollowUpDone?: boolean;
+  clientCode?: string;
+  entryNumber?: number;
+  leadSource?: string;
+  whatClientWants?: string;
+  whatEmployeeDiscussed?: string;
+  resumeUrl?: string;
+  profileAssessment?: string;
+  meetingScheduled?: string;
+  meetingDateTime?: string | Date | null;
+  meetingDateTimeStr?: string;
+  meetingLocation?: string;
+  priority?: string;
+  remarks?: string;
+  evaluationNotes?: string;
 }
 
 export interface TCreateLeadActivityPayload {

@@ -26,6 +26,8 @@ export const checkAndDispatchFollowUpReminders = async () => {
         id: true,
         fullName: true,
         phone: true,
+        clientCode: true,
+        priority: true,
         assignedToId: true,
         nextFollowUpDate: true,
       },
@@ -41,13 +43,16 @@ export const checkAndDispatchFollowUpReminders = async () => {
     for (const lead of dueLeads) {
       if (!lead.assignedToId) continue;
 
+      const isHighPriority = lead.priority === "HIGH";
+      const codeTag = lead.clientCode ? ` [${lead.clientCode}]` : "";
+
       try {
         await NotificationService.createNotification({
           userId: lead.assignedToId,
-          title: `Follow-Up Reminder: ${lead.fullName}`,
-          message: `Follow-up is due for ${lead.fullName} (${lead.phone}). Click to review notes and contact lead.`,
+          title: `${isHighPriority ? "🔴 URGENT " : "📞 "}Follow-Up: ${lead.fullName}${codeTag}`,
+          message: `${isHighPriority ? "High-priority client! " : ""}Follow-up is due for ${lead.fullName} (${lead.phone}). Click to review notes and contact lead.`,
           type: NotificationType.SYSTEM,
-          priority: NotificationPriority.HIGH,
+          priority: isHighPriority ? NotificationPriority.URGENT : NotificationPriority.HIGH,
           entityType: "LEAD",
           entityId: lead.id,
           actionUrl: `/leads/${lead.id}`,
@@ -81,7 +86,138 @@ export const checkAndDispatchFollowUpReminders = async () => {
 };
 
 /**
- * Schedules periodic follow-up reminder checks every 10 minutes.
+ * Checks for leads with scheduled meetings and dispatches:
+ * 1) 4-Day Advance Notice (e.g. 4 days before meeting)
+ * 2) Day-of / 1-Hour Notice (e.g. morning/prior to meeting)
+ */
+export const checkAndDispatchMeetingReminders = async () => {
+  try {
+    const now = new Date();
+    const fourDaysFromNow = new Date(now.getTime() + 4 * 24 * 60 * 60 * 1000);
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
+
+    let meetingsDispatched = 0;
+
+    // 1. Check for 4-Day Advance Reminders
+    const upcoming4dMeetings = await prisma.lead.findMany({
+      where: {
+        isDeleted: false,
+        meetingDateTime: {
+          lte: fourDaysFromNow,
+          gt: now,
+        },
+        meetingNotified4dAt: null,
+        assignedToId: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        fullName: true,
+        clientCode: true,
+        meetingDateTime: true,
+        meetingDateTimeStr: true,
+        resumeUrl: true,
+        assignedToId: true,
+      },
+      take: 50,
+    });
+
+    for (const lead of upcoming4dMeetings) {
+      if (!lead.assignedToId) continue;
+      const codeTag = lead.clientCode ? ` [${lead.clientCode}]` : "";
+      const timeDisplay = lead.meetingDateTimeStr || lead.meetingDateTime?.toLocaleString() || "Upcoming";
+
+      try {
+        await NotificationService.createNotification({
+          userId: lead.assignedToId,
+          title: `📅 Upcoming Consultation in 4 Days: ${lead.fullName}${codeTag}`,
+          message: `Consultation meeting scheduled for ${timeDisplay}. Click to review CV and evaluation notes.`,
+          type: NotificationType.SYSTEM,
+          priority: NotificationPriority.NORMAL,
+          entityType: "LEAD",
+          entityId: lead.id,
+          actionUrl: `/leads/${lead.id}`,
+        });
+
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { meetingNotified4dAt: now },
+        });
+
+        meetingsDispatched++;
+      } catch (err: any) {
+        console.error(`[MeetingReminder] 4-day notification error for lead ${lead.id}:`, err?.message);
+      }
+    }
+
+    // 2. Check for Day-of / Immediate (within next 2 hours) Reminders
+    const dayOfMeetings = await prisma.lead.findMany({
+      where: {
+        isDeleted: false,
+        meetingDateTime: {
+          lte: twoHoursFromNow,
+          gte: oneHourAgo,
+        },
+        meetingNotifiedDayAt: null,
+        assignedToId: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        fullName: true,
+        clientCode: true,
+        meetingDateTime: true,
+        meetingDateTimeStr: true,
+        resumeUrl: true,
+        assignedToId: true,
+      },
+      take: 50,
+    });
+
+    for (const lead of dayOfMeetings) {
+      if (!lead.assignedToId) continue;
+      const codeTag = lead.clientCode ? ` [${lead.clientCode}]` : "";
+      const timeDisplay = lead.meetingDateTimeStr || lead.meetingDateTime?.toLocaleTimeString() || "Today";
+
+      try {
+        await NotificationService.createNotification({
+          userId: lead.assignedToId,
+          title: `🔔 Meeting Starting Soon: ${lead.fullName}${codeTag}`,
+          message: `URGENT: Consultation with ${lead.fullName} is scheduled at ${timeDisplay}. Please open client profile & CV.`,
+          type: NotificationType.SYSTEM,
+          priority: NotificationPriority.URGENT,
+          entityType: "LEAD",
+          entityId: lead.id,
+          actionUrl: `/leads/${lead.id}`,
+        });
+
+        await prisma.lead.update({
+          where: { id: lead.id },
+          data: { meetingNotifiedDayAt: now },
+        });
+
+        meetingsDispatched++;
+      } catch (err: any) {
+        console.error(`[MeetingReminder] Day-of notification error for lead ${lead.id}:`, err?.message);
+      }
+    }
+
+    if (meetingsDispatched > 0) {
+      console.log(`📅 [MeetingReminder] Dispatched ${meetingsDispatched} meeting reminder alert(s).`);
+    }
+
+    return meetingsDispatched;
+  } catch (error: any) {
+    console.error("[MeetingReminder] Error in meeting reminder scheduler:", error?.message);
+    return 0;
+  }
+};
+
+/**
+ * Schedules periodic follow-up and meeting reminder checks every 10 minutes.
  * Uses native Node setInterval.
  */
 export const scheduleLeadFollowUpReminders = () => {
@@ -92,6 +228,9 @@ export const scheduleLeadFollowUpReminders = () => {
     checkAndDispatchFollowUpReminders().catch((err) =>
       console.error("[FollowUpReminder] Initial check error:", err?.message),
     );
+    checkAndDispatchMeetingReminders().catch((err) =>
+      console.error("[MeetingReminder] Initial check error:", err?.message),
+    );
   }, 15000);
 
   // Periodic recurring timer
@@ -99,7 +238,11 @@ export const scheduleLeadFollowUpReminders = () => {
     checkAndDispatchFollowUpReminders().catch((err) =>
       console.error("[FollowUpReminder] Periodic check error:", err?.message),
     );
+    checkAndDispatchMeetingReminders().catch((err) =>
+      console.error("[MeetingReminder] Periodic check error:", err?.message),
+    );
   }, CHECK_INTERVAL_MS);
 
-  console.log("🕒 [FollowUpReminder] Lead follow-up reminder scheduler initialized (every 10m).");
+  console.log("🕒 [LeadReminder] Lead follow-up & meeting reminder scheduler initialized (every 10m).");
 };
+
