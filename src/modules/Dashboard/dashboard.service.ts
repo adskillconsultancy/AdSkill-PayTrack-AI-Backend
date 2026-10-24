@@ -693,7 +693,7 @@ const getClientSummary = async (userId: string): Promise<TClientDashboardSummary
     address: `${ADSKILL.address}, ${ADSKILL.cityState}, ${ADSKILL.country}`,
     email: ADSKILL.email,
     phone: ADSKILL.phone,
-    whatsapp: "+1 (800) 235-7454",
+    whatsapp: ADSKILL.whatsapp,
     portalUrl: "https://paytrack.adskillconsultancy.com",
   };
 
