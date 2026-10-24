@@ -1,7 +1,13 @@
 import { CallOutcome, LeadActivityType, LeadStatus, Prisma } from "@prisma/client";
 import httpStatus from "http-status";
+import config from "../../config";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import {
+  deletePrivateObject,
+  getPrivateObjectSignedUrl,
+  uploadPrivateObject,
+} from "../../lib/r2";
 import {
   buildDateRangeFilter,
   buildSearchFilter,
@@ -37,7 +43,6 @@ const leadSelect = {
   status: true,
   leadSource: true,
   whatClientWants: true,
-  resumeUrl: true,
   profileAssessment: true,
   meetingScheduled: true,
   meetingDateTime: true,
@@ -90,9 +95,24 @@ const leadSelect = {
   deletedAt: true,
   createdAt: true,
   updatedAt: true,
+  documents: {
+    orderBy: { createdAt: "desc" as const },
+    select: {
+      id: true,
+      fileName: true,
+      fileSize: true,
+      mimeType: true,
+      objectKey: true,
+      bucket: true,
+      documentType: true,
+      originalUrl: true,
+      createdAt: true,
+    },
+  },
   _count: {
     select: {
       activities: true,
+      documents: true,
     },
   },
 };
@@ -118,7 +138,6 @@ const createLead = async (
     entryNumber,
     leadSource,
     whatClientWants,
-    resumeUrl,
     profileAssessment,
     meetingScheduled,
     meetingDateTime,
@@ -195,7 +214,6 @@ const createLead = async (
         referralName: referralName || null,
         leadSource: leadSource || null,
         whatClientWants: whatClientWants || null,
-        resumeUrl: resumeUrl || null,
         profileAssessment: profileAssessment || null,
         meetingScheduled: meetingScheduled || null,
         meetingDateTime: meetingDateTime ? new Date(meetingDateTime) : null,
@@ -308,7 +326,6 @@ const getAllLeads = async (
         meetingScheduled: true,
         meetingDateTime: true,
         meetingDateTimeStr: true,
-        resumeUrl: true,
         serviceId: true,
         service: {
           select: {
@@ -440,7 +457,6 @@ const updateLead = async (
     if (payload.entryNumber !== undefined) leadUpdateData.entryNumber = payload.entryNumber;
     if (payload.leadSource !== undefined) leadUpdateData.leadSource = payload.leadSource;
     if (payload.whatClientWants !== undefined) leadUpdateData.whatClientWants = payload.whatClientWants;
-    if (payload.resumeUrl !== undefined) leadUpdateData.resumeUrl = payload.resumeUrl;
     if (payload.profileAssessment !== undefined) leadUpdateData.profileAssessment = payload.profileAssessment;
     if (payload.meetingScheduled !== undefined) leadUpdateData.meetingScheduled = payload.meetingScheduled;
     if (payload.priority !== undefined) leadUpdateData.priority = payload.priority;
@@ -848,7 +864,6 @@ const getFollowUpQueue = async (
         meetingScheduled: true,
         meetingDateTime: true,
         meetingDateTimeStr: true,
-        resumeUrl: true,
         nextFollowUpDate: true,
         lastFollowUpAt: true,
         isFollowUpDone: true,
@@ -996,6 +1011,118 @@ const completeFollowUp = async (
   return result;
 };
 
+// 12. Upload Documents for Lead
+const uploadLeadDocuments = async (
+  leadId: string,
+  files: Express.Multer.File[],
+  actorId: string,
+  documentType = "RESUME",
+) => {
+  if (!files || !files.length) {
+    throw new AppError(httpStatus.BAD_REQUEST, "At least one document file is required");
+  }
+
+  const lead = await prisma.lead.findUnique({
+    where: { id: leadId, isDeleted: false },
+    select: { id: true, clientCode: true, fullName: true },
+  });
+
+  if (!lead) {
+    throw new AppError(httpStatus.NOT_FOUND, "Lead not found");
+  }
+
+  const clientCodeClean = (lead.clientCode || lead.id).replace(/[^a-zA-Z0-9_-]/g, "-");
+  const { bucket } = config.r2;
+
+  const uploadedRecords = [];
+
+  for (const file of files) {
+    const sanitizedName = file.originalname.trim().replace(/[^a-zA-Z0-9._-]/g, "-").replace(/-+/g, "-");
+    const timestamp = Date.now();
+    const objectKey = `adskill-paytrack/leads/${clientCodeClean}/documents/${timestamp}_${sanitizedName}`;
+
+    await uploadPrivateObject({
+      key: objectKey,
+      body: file.buffer,
+      contentType: file.mimetype,
+      metadata: {
+        leadId: lead.id,
+        clientCode: lead.clientCode || "",
+        uploadedBy: actorId,
+        originalName: sanitizedName,
+      },
+    });
+
+    const doc = await prisma.leadDocument.create({
+      data: {
+        leadId: lead.id,
+        fileName: file.originalname,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        objectKey,
+        bucket: bucket || "paytrackai",
+        documentType,
+        uploadedById: actorId,
+      },
+    });
+
+    const signedUrl = await getPrivateObjectSignedUrl(objectKey);
+
+    uploadedRecords.push({
+      ...doc,
+      downloadUrl: signedUrl,
+    });
+  }
+
+  return uploadedRecords;
+};
+
+// 13. Get Lead Document Download URL
+const getLeadDocumentDownload = async (documentId: string) => {
+  const doc = await prisma.leadDocument.findUnique({
+    where: { id: documentId },
+    include: { lead: { select: { fullName: true, clientCode: true } } },
+  });
+
+  if (!doc) {
+    throw new AppError(httpStatus.NOT_FOUND, "Lead document not found");
+  }
+
+  const downloadUrl = await getPrivateObjectSignedUrl(doc.objectKey);
+
+  return {
+    id: doc.id,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+    fileSize: doc.fileSize,
+    downloadUrl,
+    expiresIn: config.r2.signed_url_expires_in,
+  };
+};
+
+// 14. Delete Lead Document
+const deleteLeadDocument = async (documentId: string) => {
+  const doc = await prisma.leadDocument.findUnique({
+    where: { id: documentId },
+  });
+
+  if (!doc) {
+    throw new AppError(httpStatus.NOT_FOUND, "Lead document not found");
+  }
+
+  try {
+    await deletePrivateObject(doc.objectKey);
+  } catch (err: any) {
+    console.error(`[DeleteLeadDoc] S3 delete failed for key ${doc.objectKey}:`, err?.message);
+  }
+
+  await prisma.leadDocument.delete({
+    where: { id: documentId },
+  });
+
+  return { id: documentId, deleted: true };
+};
+
 export const LeadService = {
   createLead,
   getAllLeads,
@@ -1008,4 +1135,7 @@ export const LeadService = {
   getLeadSummaryStats,
   getFollowUpQueue,
   completeFollowUp,
+  uploadLeadDocuments,
+  getLeadDocumentDownload,
+  deleteLeadDocument,
 };

@@ -2,6 +2,7 @@ import { Router } from "express";
 import auth from "../../middlewares/auth";
 import { optionalAuth } from "../../middlewares/optionalAuth";
 import validateRequest from "../../middlewares/validateRequest";
+import upload from "../Upload/upload.middleware";
 import { LeadController } from "./lead.controller";
 import { LeadValidation } from "./lead.validation";
 
@@ -104,6 +105,26 @@ router.delete(
   "/:id",
   auth(),
   LeadController.deleteLead,
+);
+
+// 13. Lead Document Management Routes
+router.post(
+  "/:id/documents",
+  auth(),
+  upload.array("files", 10),
+  LeadController.uploadLeadDocuments,
+);
+
+router.get(
+  "/documents/:documentId/download",
+  auth(),
+  LeadController.getLeadDocumentDownload,
+);
+
+router.delete(
+  "/documents/:documentId",
+  auth(),
+  LeadController.deleteLeadDocument,
 );
 
 export const LeadRoutes = router;

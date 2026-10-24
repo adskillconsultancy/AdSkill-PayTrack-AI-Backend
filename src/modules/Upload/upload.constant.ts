@@ -8,4 +8,5 @@ export const UPLOAD_FOLDERS = {
   DOCUMENTS: "adskill-paytrack/documents",
   CASES: "adskill-paytrack/cases",
   BACKUPS: "adskill-paytrack/backups",
+  LEADS: "adskill-paytrack/leads",
 } as const;

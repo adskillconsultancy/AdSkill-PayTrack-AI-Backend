@@ -1973,7 +1973,6 @@ async function seedLeads() {
           serviceId: matchedService ? matchedService.id : null,
           leadSource: raw.leadSource || "WhatsApp",
           whatClientWants: raw.whatClientWants || null,
-          resumeUrl: raw.resumeUrl || null,
           profileAssessment: raw.profileAssessment || "Pending Evaluation",
           meetingScheduled:
             raw.meetingScheduled || (raw.meetingDateTimeStr ? "Yes" : "No"),

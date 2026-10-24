@@ -234,6 +234,7 @@ model User {
   assignedLeads           Lead[]           @relation("LeadAssignedTo")
   createdLeads            Lead[]           @relation("LeadCreatedBy")
   leadActivities          LeadActivity[]
+  uploadedLeadDocuments   LeadDocument[]   @relation("LeadDocumentUploadedBy")
 
   // Office Expense / Income Relations
   createdExpenses         OfficeExpense[]  @relation("ExpenseCreatedBy")
@@ -793,7 +794,6 @@ model Lead {
   clientCode         String?      @unique
   leadSource         String?
   whatClientWants    String?      @db.Text
-  resumeUrl          String?
   profileAssessment  String?      // Strong - Eligible, Moderate - Needs More Documentation, Weak - Not Currently Eligible, Needs Further Review, Pending Evaluation
   meetingScheduled   String?      // Yes, No, Tentative
   meetingDateTime    DateTime?
@@ -812,6 +812,7 @@ model Lead {
   followUpNotifiedAt DateTime?
 
   activities      LeadActivity[]
+  documents       LeadDocument[]
 
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
@@ -824,6 +825,30 @@ model Lead {
   @@index([nextFollowUpDate, isFollowUpDone])
   @@index([meetingDateTime])
   @@map("leads")
+}
+
+model LeadDocument {
+  id             String    @id @default(uuid())
+  leadId         String
+  lead           Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  fileName       String
+  fileSize       Int?
+  mimeType       String?
+  objectKey      String    @unique
+  bucket         String
+  documentType   String?   @default("RESUME")
+  originalUrl    String?   @db.Text
+
+  uploadedById   String?
+  uploadedBy     User?     @relation("LeadDocumentUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([uploadedById])
+  @@map("lead_documents")
 }
 
 model LeadActivity {

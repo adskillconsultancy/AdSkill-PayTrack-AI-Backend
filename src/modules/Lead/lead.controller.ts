@@ -187,6 +187,50 @@ const completeFollowUp = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const uploadLeadDocuments = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const files = req.files as Express.Multer.File[];
+  const documentType = req.body.documentType || "RESUME";
+
+  const result = await LeadService.uploadLeadDocuments(
+    id,
+    files,
+    req.user!.id,
+    documentType,
+  );
+
+  sendResponse(res, {
+    statusCode: httpStatus.CREATED,
+    success: true,
+    message: "Lead documents uploaded successfully",
+    data: result,
+  });
+});
+
+const getLeadDocumentDownload = catchAsync(async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const result = await LeadService.getLeadDocumentDownload(documentId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Document download URL generated successfully",
+    data: result,
+  });
+});
+
+const deleteLeadDocument = catchAsync(async (req: Request, res: Response) => {
+  const { documentId } = req.params;
+  const result = await LeadService.deleteLeadDocument(documentId);
+
+  sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: "Lead document deleted successfully",
+    data: result,
+  });
+});
+
 export const LeadController = {
   createLead,
   getAllLeads,
@@ -199,4 +243,7 @@ export const LeadController = {
   getLeadSummaryStats,
   getFollowUpQueue,
   completeFollowUp,
+  uploadLeadDocuments,
+  getLeadDocumentDownload,
+  deleteLeadDocument,
 };
