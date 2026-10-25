@@ -62,12 +62,13 @@ const CURATED_FAQS: TFaqItem[] = [
 ];
 
 const CENTRAL_SUPPORT = {
-  agencyName: "AdSkill Consultancy International",
-  email: "support@adskillconsultancy.com",
-  hotline: "+1 (800) 555-SKILL",
-  whatsapp: "+1 (212) 555-0199",
-  officeAddress: "555 5th Avenue, 14th Floor, New York, NY 10017",
-  businessHours: "Monday – Saturday: 9:00 AM – 7:00 PM EST",
+  agencyName: "AdSkill Consultancy Inc.",
+  email: "admin@adskillconsultancy.com",
+  hotline: "+1 425-540-7996",
+  phoneSecondary: "+1 646-881-8711",
+  whatsapp: "+1 646-772-8544",
+  officeAddress: "37-13 74th Street, Floor 2, Jackson Heights, NY 11372",
+  businessHours: "Monday – Friday: 9:00 AM – 6:00 PM EST",
   responseTime: "Within 24 business hours",
 };
 
@@ -132,8 +133,8 @@ const getSupportOverview = async (
         name: consultant.name,
         role: "Senior Immigration & Client Advisor",
         email: consultant.email,
-        phone: consultant.phone || "+1 (800) 555-SKILL",
-        whatsapp: consultant.whatsapp || consultant.phone || "+1 (212) 555-0199",
+        phone: consultant.phone || "+1 425-540-7996",
+        whatsapp: consultant.whatsapp || consultant.phone || "+1 646-772-8544",
         officeHours: "Monday – Friday: 9:00 AM – 6:00 PM EST",
       }
     : null;
