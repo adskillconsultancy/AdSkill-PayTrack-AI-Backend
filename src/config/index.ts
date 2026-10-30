@@ -44,14 +44,14 @@ export default {
     max_file_size_mb: Number(process.env.R2_MAX_FILE_SIZE_MB) || 10,
   },
   smtp: {
-    host: process.env.SMTP_HOST || "smtp.gmail.com",
-    port: Number(process.env.SMTP_PORT) || 587,
-    secure: process.env.SMTP_SECURE === "true",
-    user: process.env.SMTP_USER || "",
+    host: process.env.SMTP_HOST || "mail.privateemail.com",
+    port: Number(process.env.SMTP_PORT) || 465,
+    secure: process.env.SMTP_SECURE !== "false",
+    user: process.env.SMTP_USER || "info@adskillconsultancy.com",
     pass: process.env.SMTP_PASS || "",
-    from_name: process.env.EMAIL_FROM_NAME || "AdSkill PayTrack AI",
+    from_name: process.env.EMAIL_FROM_NAME || "AdSkill Consultancy",
     from_email:
-      process.env.EMAIL_FROM_ADDRESS || "notifications@adskillconsultancy.com",
+      process.env.EMAIL_FROM_ADDRESS || "info@adskillconsultancy.com",
   },
   stripe: {
     secret_key: process.env.STRIPE_SECRET_KEY || "",

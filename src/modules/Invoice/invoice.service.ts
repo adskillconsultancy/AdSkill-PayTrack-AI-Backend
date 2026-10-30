@@ -3,7 +3,9 @@ import { Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
 import prisma from "../../lib/prisma";
+import config from "../../config";
 import { AuditService } from "../Audit/audit.service";
+import { sendMail, wrapEmailLayout } from "../../lib/mail";
 import {
   ADSKILL,
   createBrandedDocument,
@@ -149,6 +151,55 @@ const generateInvoice = async (caseId: string, actorId: string, userRole?: strin
       caseId: invoice.caseId,
     },
   });
+
+  // Automated Email Dispatch: Send Invoice to Client with Attached PDF
+  try {
+    const clientUser = invoice.case?.user;
+    if (clientUser?.email) {
+      generateInvoicePdf(invoice.id, actorId, true, userRole, actorEmail)
+        .then((pdfBuf) => {
+          const portalUrl = config.client_url || "https://paytrack.adskillconsultancy.com";
+          const clientName = clientUser.preferredName || clientUser.name || "Valued Client";
+          const emailHtml = wrapEmailLayout(
+            `Invoice ${invoice.invoiceNumber}`,
+            `
+            <div class="badge badge-info">Official Billing Document</div>
+            <h1 class="h1">Official Tax Invoice Issued</h1>
+            <p>Dear <strong>${clientName}</strong>,</p>
+            <p>Your official tax invoice <strong>${invoice.invoiceNumber}</strong> has been issued for case <strong>${invoice.case.caseCode}</strong>.</p>
+            
+            <div class="card-detail">
+              <div class="detail-row"><span class="detail-label">Invoice Number:</span><span class="detail-value">${invoice.invoiceNumber}</span></div>
+              <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${invoice.case.service?.name || invoice.case.serviceNameSnapshot}</span></div>
+              <div class="detail-row"><span class="detail-label">Total Amount:</span><span class="detail-value font-bold">${formatMoney(Number(invoice.amount), invoice.currency)}</span></div>
+              <div class="detail-row"><span class="detail-label">Status:</span><span class="detail-value text-amber-600 font-bold">${invoice.status}</span></div>
+            </div>
+
+            <p style="font-size: 12px; color: #64748b; margin-top: 14px;">The official signed PDF document has been attached to this email. You can also view or pay your invoice directly online via your client portal:</p>
+            <a href="${portalUrl}/payments/pay-online/${caseId}" class="btn">View & Pay Online</a>
+            `
+          );
+
+          return sendMail({
+            to: clientUser.email,
+            subject: `Official Invoice [${invoice.invoiceNumber}] — AdSkill Consultancy`,
+            html: emailHtml,
+            templateName: "CLIENT_INVOICE_ISSUED",
+            metadata: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, caseId },
+            attachments: [
+              {
+                filename: `${invoice.invoiceNumber}.pdf`,
+                content: pdfBuf,
+                contentType: "application/pdf",
+              },
+            ],
+          });
+        })
+        .catch((err) => console.warn("Could not email invoice to client:", err));
+    }
+  } catch (err) {
+    console.warn("Could not initiate invoice email dispatch:", err);
+  }
 
   return invoice;
 };

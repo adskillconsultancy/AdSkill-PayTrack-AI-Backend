@@ -9,6 +9,11 @@ interface SendMailOptions {
   text?: string;
   templateName?: string;
   metadata?: Record<string, unknown>;
+  attachments?: Array<{
+    filename: string;
+    content: Buffer | string;
+    contentType?: string;
+  }>;
 }
 
 // Reusable singleton transporter
@@ -198,6 +203,7 @@ export const sendMail = async ({
   text,
   templateName = "CUSTOM",
   metadata,
+  attachments,
 }: SendMailOptions): Promise<boolean> => {
   try {
     const transporter = getTransporter();
@@ -222,6 +228,7 @@ export const sendMail = async ({
       subject,
       html,
       text: text || subject,
+      attachments,
     });
 
     console.log(`[MAIL_SENT] Successfully delivered email to ${to} (MessageId: ${info.messageId})`);

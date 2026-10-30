@@ -17,6 +17,7 @@ import {
 } from "../../shared/paginationHelper";
 import { userSearchableFields, userSortableFields, PERMISSIONS } from "./user.constant";
 import { AuditService } from "../Audit/audit.service";
+import { sendMail, wrapEmailLayout } from "../../lib/mail";
 import {
   TCreateUserPayload,
   TUpdateUserPayload,
@@ -301,6 +302,39 @@ const createUser = async (
       status: result.status,
     },
   });
+
+  // Automated Account Welcome & Onboarding Email
+  try {
+    const portalLoginUrl = config.client_url || "https://paytrack.adskillconsultancy.com";
+    const welcomeHtml = wrapEmailLayout(
+      "Your Account Credentials",
+      `
+      <div class="badge badge-success">Account Activated</div>
+      <h1 class="h1">Welcome to AdSkill Consultancy</h1>
+      <p>Hello <strong>${result.preferredName || result.name}</strong>,</p>
+      <p>Your secure account on the AdSkill PayTrack portal has been created.</p>
+      
+      <div class="card-detail">
+        <div class="detail-row"><span class="detail-label">Client / User ID:</span><span class="detail-value">${result.clientId || "N/A"}</span></div>
+        <div class="detail-row"><span class="detail-label">Login Email:</span><span class="detail-value">${result.email}</span></div>
+        <div class="detail-row"><span class="detail-label">Temporary Password:</span><span class="detail-value">${payload.password}</span></div>
+      </div>
+      
+      <p style="font-size: 12px; color: #64748b; margin-top: 12px;">Please log in and update your password upon your first visit.</p>
+      <a href="${portalLoginUrl}/login" class="btn">Log In to Portal</a>
+      `
+    );
+
+    sendMail({
+      to: result.email,
+      subject: "Welcome to AdSkill Consultancy — Your Account Credentials",
+      html: welcomeHtml,
+      templateName: "USER_WELCOME_CREDENTIALS",
+      metadata: { userId: result.id, email: result.email },
+    }).catch((mailErr) => console.warn("Failed to dispatch welcome email:", mailErr));
+  } catch (emailDispatchErr) {
+    console.warn("Could not prepare welcome email:", emailDispatchErr);
+  }
 
   return result;
 };
