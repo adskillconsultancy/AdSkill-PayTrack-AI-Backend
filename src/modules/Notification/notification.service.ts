@@ -1,9 +1,10 @@
 import { NotificationPriority, NotificationType, Prisma } from "@prisma/client";
 import httpStatus from "http-status";
 import AppError from "../../errors/AppError";
-import prisma from "../../lib/prisma";
 import { sendMail, wrapEmailLayout } from "../../lib/mail";
+import prisma from "../../lib/prisma";
 import { AuditService } from "../Audit/audit.service";
+import { ReceiptService } from "../Receipt/receipt.service";
 import {
   TCreateNotificationPayload,
   TNotificationFilters,
@@ -176,7 +177,7 @@ export const NotificationService = {
    */
   async updateUserPreferences(
     userId: string,
-    payload: TUpdateNotificationPreferencesPayload
+    payload: TUpdateNotificationPreferencesPayload,
   ) {
     return prisma.notificationPreference.upsert({
       where: { userId },
@@ -250,7 +251,7 @@ export const NotificationService = {
       </div>
       <p>You can track milestone schedules, view invoices, and communicate with your assigned consultant via your secure client portal.</p>
       <a href="https://paytrack.adskillconsultancy.com/tracking" class="btn">View Case Tracker</a>
-      `
+      `,
     );
 
     sendMail({
@@ -295,7 +296,7 @@ export const NotificationService = {
           <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${serviceName}</span></div>
         </div>
         <a href="https://paytrack.adskillconsultancy.com/clients/${clientId}" class="btn">Open Case File</a>
-        `
+        `,
       );
 
       sendMail({
@@ -338,7 +339,7 @@ export const NotificationService = {
             <div class="detail-row"><span class="detail-label">Service:</span><span class="detail-value">${serviceName}</span></div>
           </div>
           <a href="https://paytrack.adskillconsultancy.com/clients/${clientId}" class="btn">View Case Details</a>
-          `
+          `,
         );
 
         sendMail({
@@ -347,7 +348,9 @@ export const NotificationService = {
           html: consultantHtml,
           templateName: "STAFF_CASE_ASSIGNED",
           metadata: { caseCode, consultantId: consultant.id },
-        }).catch((err) => console.error("Error sending consultant email:", err));
+        }).catch((err) =>
+          console.error("Error sending consultant email:", err),
+        );
       }
     }
   },
@@ -406,7 +409,7 @@ export const NotificationService = {
       </div>
       <p>An official receipt will be generated and emailed to you as soon as verification completes.</p>
       <a href="https://paytrack.adskillconsultancy.com/payments" class="btn">View Payment Status</a>
-      `
+      `,
     );
 
     sendMail({
@@ -415,11 +418,17 @@ export const NotificationService = {
       html: clientHtml,
       templateName: "CLIENT_PAYMENT_SUBMITTED",
       metadata: { caseCode, amount: formattedAmount },
-    }).catch((err) => console.error("Error sending payment submission email:", err));
+    }).catch((err) =>
+      console.error("Error sending payment submission email:", err),
+    );
 
     // 2. Notify Super Admins
     const superAdmins = await prisma.user.findMany({
-      where: { role: { name: "SUPER_ADMIN" }, status: "ACTIVE", isDeleted: false },
+      where: {
+        role: { name: "SUPER_ADMIN" },
+        status: "ACTIVE",
+        isDeleted: false,
+      },
       select: { id: true, email: true },
     });
 
@@ -507,20 +516,54 @@ export const NotificationService = {
       </div>
       <p>Your official tax-compliant receipt is available for download in your portal.</p>
       <a href="https://paytrack.adskillconsultancy.com/invoices-receipts" class="btn">Download Official Receipt</a>
-      `
+      `,
     );
+
+    // Attempt to generate & attach official PDF receipt
+    let receiptAttachment:
+      | Array<{ filename: string; content: Buffer; contentType: string }>
+      | undefined;
+    try {
+      const receiptPdf = await ReceiptService.generatePaymentReceiptPdf(
+        params.paymentId,
+        clientId,
+        true,
+        "SUPER_ADMIN",
+      );
+      if (receiptPdf?.buffer) {
+        receiptAttachment = [
+          {
+            filename: `${receiptNumber}.pdf`,
+            content: receiptPdf.buffer,
+            contentType: "application/pdf",
+          },
+        ];
+      }
+    } catch (pdfErr) {
+      console.warn(
+        "Could not attach receipt PDF to verification email:",
+        pdfErr,
+      );
+    }
 
     sendMail({
       to: clientEmail,
-      subject: `Official Receipt [${receiptNumber}] for Payment ${formattedAmount} - AdSkill`,
+      subject: `Official Payment Receipt [${receiptNumber}] — ${formattedAmount} Received`,
       html: clientHtml,
       templateName: "CLIENT_PAYMENT_VERIFIED",
       metadata: { receiptNumber, caseCode, amount: formattedAmount },
-    }).catch((err) => console.error("Error sending payment verified email:", err));
+      attachments: receiptAttachment,
+    }).catch((err) =>
+      console.error("Error sending payment verified email:", err),
+    );
 
     // 2. Notify Super Admins
     const superAdmins = await prisma.user.findMany({
-      where: { role: { name: "SUPER_ADMIN" }, status: "ACTIVE", isDeleted: false },
+      where: {
+        role: { name: "SUPER_ADMIN" },
+        status: "ACTIVE",
+        isDeleted: false,
+      },
       select: { id: true },
     });
 
@@ -650,7 +693,9 @@ export const NotificationService = {
           title: reminderTitle,
           message: reminderMessage,
           type: NotificationType.PAYMENT,
-          priority: isUrgent ? NotificationPriority.URGENT : NotificationPriority.NORMAL,
+          priority: isUrgent
+            ? NotificationPriority.URGENT
+            : NotificationPriority.NORMAL,
           entityType: "INSTALLMENT",
           entityId: inst.id,
           actionUrl: `/payments`,
@@ -666,12 +711,12 @@ export const NotificationService = {
           <div class="card-detail">
             <div class="detail-row"><span class="detail-label">Case Reference:</span><span class="detail-value">${caseCode}</span></div>
             <div class="detail-row"><span class="detail-label">Installment:</span><span class="detail-value">#${inst.sequenceNumber} - ${inst.title || "Milestone Payment"}</span></div>
-            <div class="detail-row"><span class="detail-label">Amount Due:</span><span class="detail-value" style="font-weight: bold; color: ${isUrgent ? '#dc2626' : '#0a0a0a'}">${formattedAmount}</span></div>
+            <div class="detail-row"><span class="detail-label">Amount Due:</span><span class="detail-value" style="font-weight: bold; color: ${isUrgent ? "#dc2626" : "#0a0a0a"}">${formattedAmount}</span></div>
             <div class="detail-row"><span class="detail-label">Due Date:</span><span class="detail-value">${dueDate.toLocaleDateString()}</span></div>
           </div>
           <p>Please log in to your portal to review payment instructions and submit your receipt.</p>
           <a href="https://paytrack.adskillconsultancy.com/payments" class="btn">Pay Now & View Portal</a>
-          `
+          `,
         );
 
         sendMail({
@@ -680,7 +725,9 @@ export const NotificationService = {
           html: emailHtml,
           templateName: "SCHEDULED_PAYMENT_REMINDER",
           metadata: { caseCode, installmentId: inst.id, diffDays },
-        }).catch((err) => console.error("Error sending scheduled reminder email:", err));
+        }).catch((err) =>
+          console.error("Error sending scheduled reminder email:", err),
+        );
 
         // If overdue, also alert assigned consultant
         if (diffDays < 0 && inst.paymentPlan.case.assignedConsultantId) {
@@ -741,17 +788,28 @@ export const NotificationService = {
       },
     });
 
-    if (!inst) throw new AppError(httpStatus.NOT_FOUND, "Installment not found");
-    if (inst.status === "PAID") throw new AppError(httpStatus.BAD_REQUEST, "Installment is already fully paid");
+    if (!inst)
+      throw new AppError(httpStatus.NOT_FOUND, "Installment not found");
+    if (inst.status === "PAID")
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Installment is already fully paid",
+      );
 
     const client = inst.paymentPlan.case.user;
-    if (!client) throw new AppError(httpStatus.NOT_FOUND, "Client account not found for installment");
+    if (!client)
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "Client account not found for installment",
+      );
 
     const formattedAmount = `${inst.paymentPlan.currency} ${Number(inst.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
     const dueDate = new Date(inst.dueDate).toLocaleDateString();
 
     const title = `Payment Reminder: Case ${inst.paymentPlan.case.caseCode}`;
-    const message = customNote || `A payment of ${formattedAmount} for installment #${inst.sequenceNumber} is due on ${dueDate}.`;
+    const message =
+      customNote ||
+      `A payment of ${formattedAmount} for installment #${inst.sequenceNumber} is due on ${dueDate}.`;
 
     // 1. In-app notification
     await this.createNotification({
@@ -780,7 +838,7 @@ export const NotificationService = {
       </div>
       <p>Please log in to your portal to review payment options or upload payment proof.</p>
       <a href="https://paytrack.adskillconsultancy.com/payments" class="btn">View Payment Portal</a>
-      `
+      `,
     );
 
     sendMail({
@@ -788,8 +846,13 @@ export const NotificationService = {
       subject: `Payment Reminder [${inst.paymentPlan.case.caseCode}]: ${formattedAmount}`,
       html: emailHtml,
       templateName: "MANUAL_PAYMENT_REMINDER",
-      metadata: { installmentId: inst.id, caseCode: inst.paymentPlan.case.caseCode },
-    }).catch((err) => console.error("Error sending manual reminder email:", err));
+      metadata: {
+        installmentId: inst.id,
+        caseCode: inst.paymentPlan.case.caseCode,
+      },
+    }).catch((err) =>
+      console.error("Error sending manual reminder email:", err),
+    );
 
     if (actorId) {
       AuditService.writeAuditLog({
