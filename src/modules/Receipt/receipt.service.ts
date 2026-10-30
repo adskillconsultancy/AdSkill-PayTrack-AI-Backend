@@ -301,11 +301,16 @@ const generateReceiptPdf = async (id: string, actorId: string, staff: boolean, u
     },
   ]);
 
+  const govFee = Number(service?.estimatedGovFee || 0);
+  const attorneyFee = Number(service?.estimatedAttorneyFee || 0);
+  const thirdPartyFee = Number(service?.estimatedThirdPartyFee || 0);
+  const totalAccountValue = contractedFee + govFee + attorneyFee + thirdPartyFee;
+
   // 5. Account Standing After This Payment
   drawBalanceBox(
     doc,
     totalPaid,
-    contractedFee,
+    totalAccountValue,
     currency,
     nextInstallment
       ? `Milestone #${nextInstallment.sequenceNumber}${nextInstallment.title ? ` — ${nextInstallment.title}` : ""}`
