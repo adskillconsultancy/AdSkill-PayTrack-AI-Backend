@@ -276,7 +276,7 @@ const generateInvoicePdf = async (id: string, actorId: string, staff: boolean, u
           {
             description: "Government / USCIS Official Filing Fees",
             categoryTag: "Pass-Through",
-            note: "Official regulatory fees — pass-through cost",
+            note: "Official regulatory fees — pass-through cost (included in total)",
             amount: govFee,
             currency,
           },
@@ -305,13 +305,15 @@ const generateInvoicePdf = async (id: string, actorId: string, staff: boolean, u
         ]
       : []),
     {
-      description: "TOTAL CONTRACTED PROFESSIONAL FEE",
-      amount: contractedFee,
+      description: "TOTAL CONTRACTED PROFESSIONAL & REGULATORY FEE",
+      amount: contractedFee + govFee + attorneyFee + thirdPartyFee,
       currency,
       isBold: true,
       isTotal: true,
     },
   ];
+
+  const totalInvoiceAmount = contractedFee + govFee + attorneyFee + thirdPartyFee;
 
   drawFeeTable(doc, feeRows);
 
@@ -319,7 +321,7 @@ const generateInvoicePdf = async (id: string, actorId: string, staff: boolean, u
   drawBalanceBox(
     doc,
     totalPaid,
-    contractedFee,
+    totalInvoiceAmount,
     currency,
     nextInstallment
       ? `Milestone #${nextInstallment.sequenceNumber}${nextInstallment.title ? ` — ${nextInstallment.title}` : ""}`
