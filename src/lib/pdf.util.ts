@@ -23,7 +23,7 @@ export const ADSKILL = {
   whatsapp: "+1 646-772-8544",
   email: "admin@adskillconsultancy.com",
   website: "paytrack.adskillconsultancy.com",
-  taxId: "EIN: 47-8921034",
+  taxId: "",
   disclaimer:
     "This document is an official financial instrument issued by AdSkill Consultancy Inc. All fees are subject to the terms of the signed client services agreement. Government filing fees (USCIS/consular) and third-party fees are pass-through costs not retained by AdSkill. AdSkill professional fees are strictly non-refundable once service milestones have commenced unless expressly agreed in writing. AdSkill Consultancy Inc. is a professional corporate & immigration consulting advisory and does not provide formal legal representation. Certified copies may be re-issued upon request without modifying original historical records.",
 
@@ -155,11 +155,11 @@ export function drawHeader(
 
   // Sub-details under logo
   doc
-    .fontSize(7.2)
+    .fontSize(7.0)
     .font("Helvetica")
     .fillColor(ADSKILL.textMid)
-    .text(`${ADSKILL.address}, ${ADSKILL.cityState}  •  ${ADSKILL.phone}`, leftX, 50)
-    .text(`${ADSKILL.email}  •  ${ADSKILL.website}  •  ${ADSKILL.taxId}`, leftX, 60);
+    .text(`${ADSKILL.address}, ${ADSKILL.cityState}  •  ${ADSKILL.phone} / ${ADSKILL.phoneSecondary}`, leftX, 48)
+    .text(`WhatsApp: ${ADSKILL.whatsapp}  •  ${ADSKILL.email}  •  ${ADSKILL.website}`, leftX, 58);
 
   // 3. Document Executive Badge (Right)
   const badgeW = 175;
@@ -576,13 +576,13 @@ export function drawInstructionsAndSeal(
       .fontSize(6.8)
       .font("Helvetica")
       .fillColor(ADSKILL.textMid)
-      .text(`Bank: JPMorgan Chase Bank N.A.  •  Routing: 021000021  •  Account: 8492019482\nBeneficiary: AdSkill Consultancy Inc.  (Specify Invoice Number in Wire Memo)`, leftX + 18, boxY + 55.5);
+      .text(`For official bank wire / ACH transfer details or payment remittance,\nplease contact billing via WhatsApp: ${ADSKILL.whatsapp} or Email: ${ADSKILL.email}`, leftX + 18, boxY + 55.5);
 
     doc
       .fontSize(6.5)
       .font("Helvetica")
       .fillColor(ADSKILL.accentGold)
-      .text(`For billing queries or confirmation: ${ADSKILL.email}  |  ${ADSKILL.phone}`, leftX + 10, boxY + 83);
+      .text(`Helpline: ${ADSKILL.phone}  |  ${ADSKILL.phoneSecondary}  |  WhatsApp: ${ADSKILL.whatsapp}`, leftX + 10, boxY + 83);
   }
 
   // 2. RIGHT CARD: Official Corporate Seal & Authorization Stamp
